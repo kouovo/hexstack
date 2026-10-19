@@ -27,14 +27,16 @@ let cached: ClientEnv | undefined;
 
 export function getClientEnv(): ClientEnv {
   if (cached) return cached;
-  if (typeof window === "undefined") {
+  // API/CLI also compile this module without DOM globals in their TypeScript lib.
+  const browserWindow = (globalThis as typeof globalThis & { window?: Window }).window;
+  if (!browserWindow) {
     // Dynamic key lookup prevents Next from inlining NEXT_PUBLIC_* during the build.
     const source = process.env;
     cached = parse(Object.fromEntries(clientEnvKeys.map((key) => [key, source[key]])));
     return cached;
   }
 
-  const injected = window[PUBLIC_ENV_GLOBAL];
+  const injected = browserWindow[PUBLIC_ENV_GLOBAL];
   // Test harnesses can use defaults; don't cache them before the script arrives.
   if (!injected) return parse({});
   cached = parse(injected);

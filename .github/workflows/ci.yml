@@ -42,4 +42,7 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - name: Migrate a fresh Postgres
+        env:
+          # CI service port, not the local Compose port from .env.example.
+          POSTGRES_URL: postgres://app:app@localhost:5432/app
         run: pnpm db:migrate
