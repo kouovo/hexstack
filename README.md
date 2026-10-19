@@ -1,4 +1,4 @@
-# app template
+# hexstack
 
 A runnable TypeScript monorepo for applications with business rules, explicit use cases, and reliable background work.
 It combines **Domain-Driven Design**, **Hexagonal Architecture (ports and adapters)**, **CQRS**, a transactional outbox,
