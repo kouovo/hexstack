@@ -40,6 +40,7 @@ Authentication guidance also draws on [Pilcrow's Auth Book](https://auth.pilcrow
   - [Example flow: complete a todo](#example-flow-complete-a-todo)
 - [Interface adapters](#interface-adapters)
   - [HTTP and RPC](#http-and-rpc)
+  - [REST example: list todos](#rest-example-list-todos)
   - [DTOs and mappers](#dtos-and-mappers)
   - [Web client](#web-client)
 - [Infrastructure layer](#infrastructure-layer)
@@ -83,7 +84,7 @@ If you change a Compose host port or use existing services, update its URL in `.
 then runs API and web development servers together through Turbo. If infrastructure startup or migration fails,
 neither development server starts. These are local placeholder credentials, not production infrastructure.
 
-- API: http://localhost:3001 (health at `/health`, oRPC at `/rpc/*`).
+- API: http://localhost:3001 (health at `/health`, REST example at `GET /todos`, oRPC at `/rpc/*`).
 - Web: http://localhost:3000.
 
 Verify the API is ready:
@@ -109,22 +110,22 @@ pnpm cli user role you@example.com admin
 There are no seed passwords, automatic first-user promotion, or public admin-bootstrap endpoints.
 The role command uses the configured Postgres and Redis.
 
-| Command | Purpose |
-| --- | --- |
-| `pnpm dev` | Start and wait for infrastructure, migrate, then run API and web together |
-| `pnpm dev:api` / `pnpm dev:web` | Start one app against existing infrastructure |
-| `pnpm infra:up` | Start local Postgres and Redis and wait for health checks |
-| `pnpm build` | Bundle API and CLI with tsup; build the web app with Next.js |
-| `pnpm test` | Run Vitest; persistence tests use real migrations on PGlite, without Docker |
-| `pnpm check-types` | Type-check workspace packages and apps |
-| `pnpm lint` / `pnpm format:check` | Check code with oxlint / oxfmt |
-| `pnpm format` | Format TypeScript, JavaScript, CSS, and JSON |
-| `pnpm db:generate --name <change>` | Generate a migration from the Drizzle schema |
-| `pnpm db:migrate` | Apply pending migrations under a Postgres advisory lock |
-| `pnpm db:studio` | Open Drizzle Studio against the configured database |
-| `pnpm infra:storage` | Start MinIO, wait for readiness, and create a private bucket (API :9000, console :9001) |
-| `pnpm cli storage <put/get/head/delete/sign>` | Exercise the object-storage port without a public file API |
-| `pnpm infra:down` | Stop the local infrastructure |
+| Command                                       | Purpose                                                                                 |
+| --------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `pnpm dev`                                    | Start and wait for infrastructure, migrate, then run API and web together               |
+| `pnpm dev:api` / `pnpm dev:web`               | Start one app against existing infrastructure                                           |
+| `pnpm infra:up`                               | Start local Postgres and Redis and wait for health checks                               |
+| `pnpm build`                                  | Bundle API and CLI with tsup; build the web app with Next.js                            |
+| `pnpm test`                                   | Run Vitest; persistence tests use real migrations on PGlite, without Docker             |
+| `pnpm check-types`                            | Type-check workspace packages and apps                                                  |
+| `pnpm lint` / `pnpm format:check`             | Check code with oxlint / oxfmt                                                          |
+| `pnpm format`                                 | Format TypeScript, JavaScript, CSS, and JSON                                            |
+| `pnpm db:generate --name <change>`            | Generate a migration from the Drizzle schema                                            |
+| `pnpm db:migrate`                             | Apply pending migrations under a Postgres advisory lock                                 |
+| `pnpm db:studio`                              | Open Drizzle Studio against the configured database                                     |
+| `pnpm infra:storage`                          | Start MinIO, wait for readiness, and create a private bucket (API :9000, console :9001) |
+| `pnpm cli storage <put/get/head/delete/sign>` | Exercise the object-storage port without a public file API                              |
+| `pnpm infra:down`                             | Stop the local infrastructure                                                           |
 
 Local configuration lives in [.env.example](.env.example). Do not commit real credentials or copy its
 plain-HTTP cookie setting into production; see [Deployment rules](#deployment-rules).
@@ -148,6 +149,8 @@ curl -b /tmp/app-cookies -X POST localhost:3001/rpc/todo/create \
 curl -b /tmp/app-cookies -X POST localhost:3001/rpc/todo/complete \
   -H 'content-type: application/json' -d '{"json":{"todoId":"<id>"}}'
 curl -b /tmp/app-cookies localhost:3001/rpc/todo/list
+# Same use case over REST: no oRPC envelope, query string instead of a JSON body.
+curl -b /tmp/app-cookies 'localhost:3001/todos?status=open&limit=10'
 # completionNotifiedAt is set asynchronously by the worker while the todo is still completed.
 
 # Archive requires an admin role:
@@ -157,6 +160,7 @@ rm /tmp/app-cookies
 ```
 
 The `{ "json": ... }` envelope is oRPC's wire format, not a hand-written REST contract.
+`GET /todos` is the REST exception; see [REST example: list todos](#rest-example-list-todos).
 TypeScript consumers should normally use the [typed client](packages/rpc/src/client.ts).
 
 </details>
@@ -176,13 +180,13 @@ do not imply event sourcing. Current state is stored in relational tables, not r
 
 ### Benefits and costs
 
-| Benefits | Costs and limits |
-| --- | --- |
-| Domain behavior can be tested without HTTP, Postgres, or Redis | More files and mapping than a direct CRUD endpoint |
-| Use cases can be invoked from multiple entry points | DI tokens, handler registration, and transaction boundaries need care |
-| Infrastructure dependencies are visible through ports | Replacing Postgres or BullMQ still requires implementing their guarantees |
-| Outbox consumers can retry after a process failure | Delivery is at-least-once; consumers must be idempotent; Redis must be durable |
-| Permission checks are centralized at the RPC boundary | Internal command/query calls are trusted; new entry points need their own authorization |
+| Benefits                                                       | Costs and limits                                                                        |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Domain behavior can be tested without HTTP, Postgres, or Redis | More files and mapping than a direct CRUD endpoint                                      |
+| Use cases can be invoked from multiple entry points            | DI tokens, handler registration, and transaction boundaries need care                   |
+| Infrastructure dependencies are visible through ports          | Replacing Postgres or BullMQ still requires implementing their guarantees               |
+| Outbox consumers can retry after a process failure             | Delivery is at-least-once; consumers must be idempotent; Redis must be durable          |
+| Permission checks are centralized at the RPC boundary          | Internal command/query calls are trusted; new entry points need their own authorization |
 
 Use this structure when the rules and workflows justify the overhead. Do not add a port, service, or value object
 just to fill an architectural diagram.
@@ -220,14 +224,14 @@ that contract, but its source dependency points **toward** the application port,
 
 These are local trade-offs, not universal DDD rules:
 
-| Choice | Reason / consequence |
-| --- | --- |
-| Layer packages, with context folders inside them | Keep `packages/application` together instead of creating separate ports/usecases packages; related `todo` files span a few explicit layers |
-| Repository/specification-based reads | The example query handlers use the same domain/repository vocabulary as commands; no separate SQL projection layer yet |
-| Shared Zod schemas for inputs and value-object guards where appropriate | Less validation duplication, at the cost of a deliberate validation-library dependency in the core |
-| One plain-object mapper in application | `toEntity`, `toPersistence`, and `toResponse` stay together, without DI; stored record shapes are consequently visible to application code |
-| Typed errors, ordinary throws | Business failures extend `DomainError` with a literal `_tag` and typed fields; HTTP/RPC translate them centrally and BullMQ reads `retryable` (see [Errors](#errors)) |
-| Post-commit in-process events | Logging/broadcast failures cannot roll back successful writes; required side effects use the outbox instead |
+| Choice                                                                  | Reason / consequence                                                                                                                                                  |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Layer packages, with context folders inside them                        | Keep `packages/application` together instead of creating separate ports/usecases packages; related `todo` files span a few explicit layers                            |
+| Repository/specification-based reads                                    | The example query handlers use the same domain/repository vocabulary as commands; no separate SQL projection layer yet                                                |
+| Shared Zod schemas for inputs and value-object guards where appropriate | Less validation duplication, at the cost of a deliberate validation-library dependency in the core                                                                    |
+| One plain-object mapper in application                                  | `toEntity`, `toPersistence`, and `toResponse` stay together, without DI; stored record shapes are consequently visible to application code                            |
+| Typed errors, ordinary throws                                           | Business failures extend `DomainError` with a literal `_tag` and typed fields; HTTP/RPC translate them centrally and BullMQ reads `retryable` (see [Errors](#errors)) |
+| Post-commit in-process events                                           | Logging/broadcast failures cannot roll back successful writes; required side effects use the outbox instead                                                           |
 
 ## Modules and project structure
 
@@ -280,9 +284,9 @@ workspace dependency. The browser uses router **types**, not server implementati
 
 The core consists of two kinds of responsibility:
 
-| Layer | Owns | Does not own |
-| --- | --- | --- |
-| **Domain** | Meaningful values, allowed transitions, entity behavior, facts that happened | HTTP routes, cookies, SQL queries, queue clients |
+| Layer           | Owns                                                                                            | Does not own                                                 |
+| --------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Domain**      | Meaningful values, allowed transitions, entity behavior, facts that happened                    | HTTP routes, cookies, SQL queries, queue clients             |
 | **Application** | Use-case sequencing, ports, transaction boundaries, response mapping, side-effect orchestration | Hono/Next handlers or concrete Postgres/Redis/BullMQ clients |
 
 The core is not literally dependency-free. It uses shared primitives, CQRS/DI decorators, and Zod; application session
@@ -332,17 +336,17 @@ Examples: [todo commands](packages/application/src/todo/commands), [todo queries
 A port describes a capability the use case needs, without exposing the tool that provides it.
 Design it around application behavior, not around an ORM's entire API.
 
-| Port | Implementation |
-| --- | --- |
-| [ITodoRepository](packages/application/src/todo/todo.repository.port.ts) | [Kysely TodoRepository](packages/persistence/src/todo/todo.repository.ts) |
-| [IUserRepository](packages/application/src/user/user.repository.port.ts) | [Kysely UserRepository](packages/persistence/src/user/user.repository.ts) |
-| [ISessionRepository](packages/application/src/auth/session.repository.port.ts) | [Kysely SessionRepository](packages/persistence/src/session/session.repository.ts) |
-| [ApplicationTransactionPort](packages/application/src/transaction/transaction.port.ts) | [ApplicationTransactionAdapter](packages/persistence/src/transaction/application-transaction-adapter.ts) |
-| [PasswordHasher](packages/application/src/auth/password-hasher.port.ts) | [Argon2PasswordHasher](packages/auth/src/argon2-password-hasher.ts) |
-| [RateLimiter](packages/application/src/auth/rate-limiter.port.ts) | [RedisTokenBucketRateLimiter](packages/auth/src/redis-rate-limiter.ts) |
-| [JobDispatcher](packages/application/src/queue/queue.port.ts) | [BullMQ adapter](packages/queue/src) |
-| [CachePort](packages/application/src/cache/cache.port.ts) | [RedisCacheAdapter](packages/cache/src/redis-cache.adapter.ts) |
-| [ObjectStoragePort](packages/application/src/storage/object-storage.port.ts) | [Local](packages/storage/src/local-object-storage.adapter.ts) / [MinIO](packages/storage/src/minio-object-storage.adapter.ts) adapters |
+| Port                                                                                   | Implementation                                                                                                                         |
+| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| [ITodoRepository](packages/application/src/todo/todo.repository.port.ts)               | [Kysely TodoRepository](packages/persistence/src/todo/todo.repository.ts)                                                              |
+| [IUserRepository](packages/application/src/user/user.repository.port.ts)               | [Kysely UserRepository](packages/persistence/src/user/user.repository.ts)                                                              |
+| [ISessionRepository](packages/application/src/auth/session.repository.port.ts)         | [Kysely SessionRepository](packages/persistence/src/session/session.repository.ts)                                                     |
+| [ApplicationTransactionPort](packages/application/src/transaction/transaction.port.ts) | [ApplicationTransactionAdapter](packages/persistence/src/transaction/application-transaction-adapter.ts)                               |
+| [PasswordHasher](packages/application/src/auth/password-hasher.port.ts)                | [Argon2PasswordHasher](packages/auth/src/argon2-password-hasher.ts)                                                                    |
+| [RateLimiter](packages/application/src/auth/rate-limiter.port.ts)                      | [RedisTokenBucketRateLimiter](packages/auth/src/redis-rate-limiter.ts)                                                                 |
+| [JobDispatcher](packages/application/src/queue/queue.port.ts)                          | [BullMQ adapter](packages/queue/src)                                                                                                   |
+| [CachePort](packages/application/src/cache/cache.port.ts)                              | [RedisCacheAdapter](packages/cache/src/redis-cache.adapter.ts)                                                                         |
+| [ObjectStoragePort](packages/application/src/storage/object-storage.port.ts)           | [Local](packages/storage/src/local-object-storage.adapter.ts) / [MinIO](packages/storage/src/minio-object-storage.adapter.ts) adapters |
 
 The same interfaces support in-memory test adapters. Mappers and simple policies do **not** need a port or DI token
 when there is no external capability to abstract.
@@ -409,7 +413,7 @@ import { Password } from "@app/domain";
 
 async function hashNewPassword(hasher: PasswordHasher, raw: string) {
   const password = Password.create(raw); // policy enforced here
-  return hasher.hash(password);          // Promise<PasswordHash>, not a raw string
+  return hasher.hash(password); // Promise<PasswordHash>, not a raw string
 }
 ```
 
@@ -440,8 +444,7 @@ Specifications describe **which entities match**, without teaching the domain SQ
 ```ts
 import { TodoId, TodoIdSpecification, TodoStatus, TodoStatusSpecification } from "@app/domain";
 
-const spec = new TodoIdSpecification(TodoId.create("todo_example"))
-  .and(new TodoStatusSpecification(TodoStatus.open()));
+const spec = new TodoIdSpecification(TodoId.create("todo_example")).and(new TodoStatusSpecification(TodoStatus.open()));
 ```
 
 - In memory, `spec.isSatisfiedBy(entity)` evaluates it directly; application test adapters use this path.
@@ -522,13 +525,13 @@ Event data crosses boundaries as serializable values, not live entities.
 
 There are two deliberately different mechanisms:
 
-| | In-process `@eventHandler` | Durable `@outboxHandler` |
-| --- | --- | --- |
-| Example | [Todo logging handlers](packages/application/src/todo/events) | [DispatchTodoCompletedOutboxHandler](packages/application/src/todo/todo-outbox-handlers.ts) |
-| Execution | After commit, in the same process via `EventBus` | The relay publishes the committed row to the BullMQ `domain-event` queue; a worker runs one consumer per job |
-| Guarantee | Best-effort; failures cannot fail a committed command; process death can lose delivery | At-least-once; BullMQ owns attempts, backoff and failed-job retention |
-| Suitable for | Non-critical logging or broadcasts | Side effects that require durable delivery, such as enqueueing a job |
-| Registration | [registerDomainCqrsHandlers()](packages/application/src/register.ts) | [registerApplicationOutboxHandlers()](packages/application/src/register-application-outbox-handlers.ts) **and** [durable-event-types.ts](packages/application/src/outbox/durable-event-types.ts) |
+|              | In-process `@eventHandler`                                                             | Durable `@outboxHandler`                                                                                                                                                                         |
+| ------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Example      | [Todo logging handlers](packages/application/src/todo/events)                          | [DispatchTodoCompletedOutboxHandler](packages/application/src/todo/todo-outbox-handlers.ts)                                                                                                      |
+| Execution    | After commit, in the same process via `EventBus`                                       | The relay publishes the committed row to the BullMQ `domain-event` queue; a worker runs one consumer per job                                                                                     |
+| Guarantee    | Best-effort; failures cannot fail a committed command; process death can lose delivery | At-least-once; BullMQ owns attempts, backoff and failed-job retention                                                                                                                            |
+| Suitable for | Non-critical logging or broadcasts                                                     | Side effects that require durable delivery, such as enqueueing a job                                                                                                                             |
+| Registration | [registerDomainCqrsHandlers()](packages/application/src/register.ts)                   | [registerApplicationOutboxHandlers()](packages/application/src/register-application-outbox-handlers.ts) **and** [durable-event-types.ts](packages/application/src/outbox/durable-event-types.ts) |
 
 `OutboxService.append()` stores only events with a declared durable consumer. Here that is `TodoCompletedEvent`;
 creation/archive events have in-process handlers only. Startup checks durable handler/type registration for consistency.
@@ -620,6 +623,52 @@ command/query, and present the response. They do not own business rules or SQL.
 - `StrictGetMethodPlugin` rejects GET calls to mutations; route metadata alone is not sufficient for the RPC transport.
 - Session cookies become a principal in request-scoped `AsyncLocalStorage`; the same context carries a request id.
 - Non-RPC routes can be added in `createApp()`, but must explicitly apply any required authorization themselves.
+  [GET /todos](#rest-example-list-todos) is that example.
+
+### REST example: list todos
+
+[apps/api/src/routes/todos.ts](apps/api/src/routes/todos.ts) is a hand-written REST adapter for the same
+[ListTodosQuery](packages/application/src/todo/queries/list-todos.query.ts) that `todo.list` dispatches. It does not
+duplicate the query, the repository, or the cache. The HTTP app owns the route because it is not an oRPC procedure.
+
+```sh
+curl -b /tmp/app-cookies 'localhost:3001/todos?status=open&limit=10'
+```
+
+| | oRPC `GET /rpc/todo/list` | REST `GET /todos` |
+| --- | --- | --- |
+| Input | `?data=` JSON envelope, or a JSON body | `status` and `limit` query parameters |
+| Success | `{ "json": [ ... ] }` | `{ "todos": [ ... ] }` |
+| Auth | procedure `meta` (`todo:read`) | the route checks the principal itself |
+
+Both return the same [todo DTO](packages/application/src/todo/todo.dto.ts): `id`, `title`, `status`, `completedAt`,
+`completionNotifiedAt`, `createdAt`, `updatedAt`. `status` is `open`, `completed`, or `archived`. `limit` defaults to
+50 and must be 1–100. Omit either parameter to leave it unset.
+
+```json
+{
+  "todos": [
+    {
+      "id": "todo_01h",
+      "title": "hello",
+      "status": "open",
+      "completedAt": null,
+      "completionNotifiedAt": null,
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+The route does not inherit oRPC middleware, so it repeats the boundary checks:
+
+- No session cookie: `401` `{ "_tag": "UnauthorizedException", "message": "Sign in required" }`.
+- Signed in without `todo:read`: `403` `{ "_tag": "ForbiddenException", ... }`.
+- `status` or `limit` fails the query schema: `400` `{ "_tag": "InvalidInput", "message": "..." }`.
+
+Known domain errors thrown by the query still go through Hono `onError` and the shared public projection.
+Create, complete, and archive stay on oRPC; this route is only the list example.
 
 The [CLI](apps/cli/src/commands) is another primary adapter. Its role-assignment command invokes the same application
 use case from a trusted operator context. Authorization at the RPC boundary does not magically protect direct
@@ -633,11 +682,11 @@ serialize an entire entity and attempt to remove secrets afterward.
 [TodoMapper](packages/application/src/todo/todo.mapper.ts) is a **plain object**, with no decorators or DI, implementing
 [IMapper](packages/core/src/shared/mapper.ts):
 
-| Method | Responsibility |
-| --- | --- |
-| `toEntity(record)` | Rehydrate a domain entity; normalize driver timestamps |
-| `toPersistence(entity)` | Produce the stored record, with database-facing names and `Date` values |
-| `toResponse(entity)` | Produce an explicit DTO with serializable primitive values and ISO timestamps |
+| Method                  | Responsibility                                                                |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| `toEntity(record)`      | Rehydrate a domain entity; normalize driver timestamps                        |
+| `toPersistence(entity)` | Produce the stored record, with database-facing names and `Date` values       |
+| `toResponse(entity)`    | Produce an explicit DTO with serializable primitive values and ISO timestamps |
 
 `TodoRecord` is declared alongside the [repository port](packages/application/src/todo/todo.repository.port.ts).
 The SQL adapter imports the mapper from application, so application never imports persistence. Type checking verifies
@@ -753,12 +802,12 @@ Redis need distinct prefixes. There is no stampede protection; add it only if me
 The [object-storage port](packages/application/src/storage/object-storage.port.ts) and [storage package](packages/storage)
 follow Kouo's `local` / `minio` driver structure and method names:
 
-| Method | Behavior |
-| --- | --- |
-| `putObject({ key, body, contentType?, metadata? })` | Upload a string, bytes, ArrayBuffer, Blob, or web ReadableStream |
-| `getObject({ key })` | Return metadata and a consumable/cancellable Blob or web stream |
-| `headObject({ key })` | Inspect size, content type, metadata, and last-modified data |
-| `deleteObject({ key })` | Idempotent deletion |
+| Method                                                     | Behavior                                                                     |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `putObject({ key, body, contentType?, metadata? })`        | Upload a string, bytes, ArrayBuffer, Blob, or web ReadableStream             |
+| `getObject({ key })`                                       | Return metadata and a consumable/cancellable Blob or web stream              |
+| `headObject({ key })`                                      | Inspect size, content type, metadata, and last-modified data                 |
+| `deleteObject({ key })`                                    | Idempotent deletion                                                          |
 | `createSignedObjectUrl({ key, method, expiresInSeconds })` | Issue a GET/PUT bearer URL with a 1..3600-second lifetime; minio driver only |
 
 The MinIO SDK driver can target MinIO or a compatible private S3 endpoint. Storage errors are not cache misses:
@@ -896,11 +945,11 @@ See [SessionService](packages/application/src/auth/session.service.ts), [token g
 
 [permissions.ts](packages/domain/src/rbac/permissions.ts) is the single resource/action and role-permission map:
 
-| Role | Todo actions | User actions |
-| --- | --- | --- |
-| `admin` | create, read, complete, archive | list, assignRole |
-| `member` (signup default) | create, read, complete | — |
-| `viewer` | read | — |
+| Role                      | Todo actions                    | User actions     |
+| ------------------------- | ------------------------------- | ---------------- |
+| `admin`                   | create, read, complete, archive | list, assignRole |
+| `member` (signup default) | create, read, complete          | —                |
+| `viewer`                  | read                            | —                |
 
 [Protected RPC procedures](packages/rpc/src/procedure.ts) require sign-in by default. Only explicit `public: true`
 procedures opt out (`ping`, sign-up, sign-in, `auth.me`). Permission metadata requires **all** listed actions.
@@ -922,8 +971,7 @@ The Redis token bucket is atomic across replicas:
 - No permanent account lockout; Redis failures fail closed. Add an edge/global limit as well—these buckets are not
   a general denial-of-service defence.
 
-Account existence is intentionally visible: duplicate sign-up is 409, unknown sign-in email is 404, wrong password is
-401. If your application requires enumeration privacy, change the responses and review timing and every other account flow.
+Account existence is intentionally visible: duplicate sign-up is 409, unknown sign-in email is 404, wrong password is 401. If your application requires enumeration privacy, change the responses and review timing and every other account flow.
 
 ### Deployment rules
 
@@ -964,13 +1012,13 @@ Keep tests focused on business behavior: Todo lifecycles, user accounts, authent
 Do not add standalone tests for generic helpers, dependency registration, configuration, or infrastructure adapters.
 Use the lightest adapter that proves the business boundary being tested:
 
-| Scope | What is exercised | Examples |
-| --- | --- | --- |
-| Domain | Guards, state transitions, value objects, specifications, role permissions | [TodoEntity tests](packages/domain/src/todo/todo.entity.test.ts), [password tests](packages/domain/src/user/password.value-object.test.ts) |
-| Application | Use cases through in-memory repository/transaction/auth ports | [Todo use cases](packages/application/src/todo/todo.test.ts), [auth use cases](packages/application/src/auth/auth.test.ts) |
-| Mapping and events | Entity/record/DTO conversions and real in-process event dispatch | [Mapper tests](packages/application/src/todo/todo.mapper.test.ts), [event tests](packages/application/src/todo/events/todo-event-handlers.test.ts) |
-| Persistence | Todo/user/session storage, business constraints, transaction rollback, conditional updates | [Todo repository](packages/persistence/src/todo/todo.repository.test.ts), [user/session persistence](packages/persistence/src/user/user.repository.test.ts) |
-| Business entry points | CLI role assignment, RPC permissions, HTTP Todo/auth flows and protection against unauthorized writes | [CLI tests](apps/cli/src/commands/user.test.ts), [RPC tests](packages/rpc/src/router.test.ts), [HTTP tests](apps/api/src/app.test.ts) |
+| Scope                 | What is exercised                                                                                     | Examples                                                                                                                                                    |
+| --------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Domain                | Guards, state transitions, value objects, specifications, role permissions                            | [TodoEntity tests](packages/domain/src/todo/todo.entity.test.ts), [password tests](packages/domain/src/user/password.value-object.test.ts)                  |
+| Application           | Use cases through in-memory repository/transaction/auth ports                                         | [Todo use cases](packages/application/src/todo/todo.test.ts), [auth use cases](packages/application/src/auth/auth.test.ts)                                  |
+| Mapping and events    | Entity/record/DTO conversions and real in-process event dispatch                                      | [Mapper tests](packages/application/src/todo/todo.mapper.test.ts), [event tests](packages/application/src/todo/events/todo-event-handlers.test.ts)          |
+| Persistence           | Todo/user/session storage, business constraints, transaction rollback, conditional updates            | [Todo repository](packages/persistence/src/todo/todo.repository.test.ts), [user/session persistence](packages/persistence/src/user/user.repository.test.ts) |
+| Business entry points | CLI role assignment, RPC permissions, HTTP Todo/auth flows and protection against unauthorized writes | [CLI tests](apps/cli/src/commands/user.test.ts), [RPC tests](packages/rpc/src/router.test.ts), [HTTP tests](apps/api/src/app.test.ts)                       |
 
 ```sh
 pnpm test

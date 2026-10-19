@@ -16,6 +16,7 @@
     "@app/bootstrap": "workspace:*",
     "@app/context": "workspace:*",
     "@app/core": "workspace:*",
+    "@app/cqrs": "workspace:*",
     "@app/di": "workspace:*",
     "@app/env": "workspace:*",
     "@app/logger": "workspace:*",

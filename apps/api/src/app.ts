@@ -10,6 +10,7 @@ import { csrf } from "./middlewares/csrf";
 import { appLogger } from "./middlewares/logger";
 import { requestContext } from "./middlewares/request-context";
 import { rpc } from "./middlewares/rpc";
+import { listTodos } from "./routes/todos";
 
 export type CreateAppOptions = {
   /** Browser origins allowed to call the API with cookies (CORS + CSRF). Defaults to CORS_ORIGINS. */
@@ -45,6 +46,8 @@ export function createApp({ trustedOrigins = env.CORS_ORIGINS }: CreateAppOption
 
   app.notFound((c) => c.json({ _tag: "NotFoundException", message: "Not found" } satisfies PublicError, 404));
   app.get("/health", (c) => c.json({ status: "ok" }));
+  // REST example. Authorization lives in the handler: Hono routes do not inherit oRPC procedure meta.
+  app.get("/todos", (c) => listTodos(c));
   app.use("/rpc/*", rpc({ prefix: "/rpc" }));
 
   return app;

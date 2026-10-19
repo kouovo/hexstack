@@ -56,6 +56,9 @@ importers:
       '@app/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@app/cqrs':
+        specifier: workspace:*
+        version: link:../../packages/cqrs
       '@app/di':
         specifier: workspace:*
         version: link:../../packages/di

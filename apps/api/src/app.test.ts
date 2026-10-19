@@ -127,6 +127,27 @@ function expectNoSecrets(json: unknown) {
 }
 
 describe("todo use cases over HTTP", () => {
+  test("GET /todos lists the caller's readable todos as plain JSON", async () => {
+    expect((await app.request("/todos")).status).toBe(401);
+    const cookie = await signUp();
+    await post("/rpc/todo/create", { title: "ship the rest example" }, { cookie });
+    await post("/rpc/todo/create", { title: "leave this open" }, { cookie });
+
+    const listed = await app.request("/todos?status=open&limit=10", { headers: { cookie } });
+    expect(listed.status).toBe(200);
+    expect(listed.headers.get("content-type")).toContain("application/json");
+    const body = (await listed.json()) as { todos: { title: string; status: string }[] };
+    expect(body.todos.map((todo) => todo.title)).toEqual(expect.arrayContaining(["leave this open", "ship the rest example"]));
+    expect(body.todos).toHaveLength(2);
+    expect(body.todos.every((todo) => todo.status === "open")).toBe(true);
+    expectNoSecrets(body);
+
+    expect((await app.request("/todos?status=nope", { headers: { cookie } })).status).toBe(400);
+    expect((await app.request("/todos?limit=0", { headers: { cookie } })).status).toBe(400);
+    [...users.values()][0]!.changeRole(UserRole.create("viewer"));
+    expect((await app.request("/todos", { headers: { cookie } })).status).toBe(200);
+  });
+
   test("authenticated members can create and complete a todo, but cannot complete it twice", async () => {
     expect((await post("/rpc/todo/create", { title: "over http" })).status).toBe(401);
     const cookie = await signUp();
