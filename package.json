@@ -1,0 +1,51 @@
+{
+  "name": "app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "check-types": "turbo run check-types",
+    "lint": "oxlint . --deny-warnings",
+    "lint:fix": "oxlint . --fix",
+    "format": "oxfmt \"**/*.{ts,tsx,js,mjs,css,json}\"",
+    "format:check": "oxfmt --check \"**/*.{ts,tsx,js,mjs,css,json}\"",
+    "dev": "pnpm infra:up && pnpm db:migrate && turbo run dev --filter=api --filter=web",
+    "dev:api": "turbo run dev --filter=api",
+    "cli": "pnpm --filter cli cli",
+    "db:generate": "pnpm --filter @app/persistence db:generate",
+    "db:migrate": "pnpm --filter cli cli db migrate",
+    "db:studio": "pnpm --filter @app/persistence studio",
+    "infra:up": "docker compose -f deployment/docker/compose.yaml up -d --wait --wait-timeout 120",
+    "infra:down": "docker compose -f deployment/docker/compose.yaml --profile storage down",
+    "prepare": "simple-git-hooks",
+    "dev:web": "turbo run dev --filter=web",
+    "infra:storage": "docker compose -f deployment/docker/compose.yaml --profile storage run --rm -T object-storage-init"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "dotenv-cli": "^8.0.0",
+    "lint-staged": "^17.5.0",
+    "oxfmt": "^0.48.0",
+    "oxlint": "^1.63.0",
+    "simple-git-hooks": "^2.14.0",
+    "tsx": "^4.20.0",
+    "turbo": "^2.9.9",
+    "typescript": "7.0.2",
+    "vitest": "^4.1.10"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm exec lint-staged"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs}": [
+      "oxlint --fix --deny-warnings",
+      "oxfmt"
+    ],
+    "*.{css,json}": "oxfmt --no-error-on-unmatched-pattern"
+  },
+  "engines": {
+    "node": ">=24.7"
+  },
+  "packageManager": "pnpm@12.4.1"
+}

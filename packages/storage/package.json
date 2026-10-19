@@ -1,0 +1,23 @@
+{
+  "name": "@app/storage",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@app/application": "workspace:*",
+    "@app/di": "workspace:*",
+    "@app/domain": "workspace:*",
+    "@app/env": "workspace:*",
+    "minio": "8.0.7"
+  },
+  "devDependencies": {
+    "@app/typescript-config": "workspace:*",
+    "@types/node": "^24.10.0"
+  }
+}

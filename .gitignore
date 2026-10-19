@@ -1,0 +1,31 @@
+# Dependencies
+node_modules
+
+# Local env files
+.env
+.env.local
+.env.*.local
+
+# Testing
+coverage
+
+# Turbo
+.turbo
+
+# Build outputs
+dist
+build
+
+# Debug
+npm-debug.log*
+
+# Local object-storage data (all apps/cwds)
+.app-storage/
+
+# Misc
+.DS_Store
+*.pem
+
+# Next.js
+.next
+next-env.d.ts

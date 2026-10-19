@@ -1,0 +1,60 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "ui": "stream-with-experimental-timestamps",
+  "tasks": {
+    "build": {
+      // Packages export TS source and have no build task, so their files must be hashed here or bundles go stale.
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*",
+        "$TURBO_ROOT$/.env*",
+        "$TURBO_ROOT$/packages/*/src/**",
+        "$TURBO_ROOT$/packages/*/schema/**",
+        "$TURBO_ROOT$/packages/*/index.ts",
+        "$TURBO_ROOT$/packages/*/package.json",
+        "$TURBO_ROOT$/packages/typescript-config/*.json"
+      ],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "lint": {
+      "dependsOn": ["^lint"]
+    },
+    "test": {
+      "dependsOn": ["^test"],
+      "cache": false
+    },
+    "check-types": {
+      "dependsOn": ["^check-types"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "env": [
+        "PORT",
+        "POSTGRES_URL",
+        "REDIS_URL",
+        "LOG_LEVEL",
+        "CORS_ORIGINS",
+        "SESSION_COOKIE_SECURE",
+        "NEXT_PUBLIC_RPC_URL",
+        "CACHE_ENABLED",
+        "CACHE_KEY_PREFIX",
+        "STORAGE_DRIVER",
+        "STORAGE_BUCKET",
+        "STORAGE_LOCAL_ROOT",
+        "STORAGE_MINIO_ENDPOINT",
+        "STORAGE_MINIO_ACCESS_KEY",
+        "STORAGE_MINIO_SECRET_KEY",
+        "STORAGE_MINIO_REGION",
+        "STORAGE_MINIO_USE_SSL",
+        "DB_STATEMENT_TIMEOUT_MS",
+        "DB_HEAVY_STATEMENT_TIMEOUT_MS",
+        "OUTBOX_RELAY_TICK_INTERVAL_MS",
+        "OUTBOX_CLEANUP_TICK_INTERVAL_MS",
+        "DOMAIN_EVENT_JOB_ATTEMPTS",
+        "DOMAIN_EVENT_JOB_BACKOFF_MS"
+      ]
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@app/env",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@app/zod": "workspace:*",
+    "@t3-oss/env-core": "^0.13.11"
+  },
+  "devDependencies": {
+    "@app/typescript-config": "workspace:*",
+    "@types/node": "^24.10.0"
+  }
+}

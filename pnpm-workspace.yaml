@@ -1,0 +1,9 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+# mise pins pnpm explicitly; don't let pnpm install another copy when it reads package.json#packageManager.
+pmOnFail: ignore
+allowBuilds:
+  esbuild: false
+  msgpackr-extract: false
+  simple-git-hooks: false

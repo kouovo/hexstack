@@ -1,0 +1,24 @@
+{
+  "name": "@app/cache",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@app/application": "workspace:*",
+    "@app/di": "workspace:*",
+    "@app/domain": "workspace:*",
+    "@app/env": "workspace:*",
+    "@app/logger": "workspace:*",
+    "@app/redis": "workspace:*"
+  },
+  "devDependencies": {
+    "@app/typescript-config": "workspace:*",
+    "@types/node": "^24.10.0"
+  }
+}

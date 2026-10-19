@@ -1,0 +1,19 @@
+{
+  "name": "@app/context",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@app/di": "workspace:*"
+  },
+  "devDependencies": {
+    "@app/typescript-config": "workspace:*",
+    "@types/node": "^24.10.0"
+  }
+}

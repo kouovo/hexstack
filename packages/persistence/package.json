@@ -1,0 +1,34 @@
+{
+  "name": "@app/persistence",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate --config drizzle.config.ts",
+    "studio": "dotenv -e ../../.env -- drizzle-kit studio --config drizzle.config.ts"
+  },
+  "dependencies": {
+    "@app/application": "workspace:*",
+    "@app/core": "workspace:*",
+    "@app/di": "workspace:*",
+    "@app/domain": "workspace:*",
+    "@app/env": "workspace:*",
+    "@app/logger": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "kysely": "^0.28.17",
+    "kysely-postgres-js": "^3.0.0",
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "@app/typescript-config": "workspace:*",
+    "@electric-sql/pglite": "^0.4.5",
+    "@types/node": "^24.10.0",
+    "drizzle-kit": "^0.31.10",
+    "vitest": "^4.1.10"
+  }
+}

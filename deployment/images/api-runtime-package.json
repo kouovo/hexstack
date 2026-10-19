@@ -1,0 +1,8 @@
+{
+  "name": "app-api-runtime",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "thread-stream": "4.2.0"
+  }
+}

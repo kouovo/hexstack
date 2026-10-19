@@ -1,0 +1,29 @@
+# Runtime images only consume prebuilt artifacts and their runtime manifest.
+**
+!deployment/
+!deployment/images/
+!deployment/images/**
+!apps/
+!apps/api/
+!apps/api/dist/
+!apps/api/dist/index.js
+!apps/api/drizzle/
+!apps/api/drizzle/postgres/
+!apps/api/drizzle/postgres/**
+!apps/cli/
+!apps/cli/dist/
+!apps/cli/dist/cli.js
+!apps/web/
+!apps/web/.next/
+!apps/web/.next/standalone/
+!apps/web/.next/standalone/**
+!apps/web/.next/static/
+!apps/web/.next/static/**
+
+# Even if Next traces env files, none may enter an image. Do not exclude
+# **/node_modules: standalone needs its own nested dependency tree.
+**/.env
+**/.env.*
+**/.git
+**/*.log
+**/*.map

@@ -1,0 +1,90 @@
+name: Release images
+
+# Host-built artifacts, packaged for linux/amd64. Public URLs are configured
+# at web-container runtime; no deployment-specific GitHub variables are needed.
+# main -> edge + sha; v1.2.3 -> 1.2.3 + 1.2 + latest + sha.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: release-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  app-images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NODE_OPTIONS: --max-old-space-size=4096
+    strategy:
+      fail-fast: true
+      matrix:
+        image:
+          - name: api
+            dockerfile: deployment/images/api.Dockerfile
+            filters: --filter=api --filter=cli
+          - name: web
+            dockerfile: deployment/images/web.Dockerfile
+            filters: --filter=web...
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Only placeholders; no repository/deployment secrets enter the build.
+      - run: cp .env.example .env
+
+      - name: Build artifacts
+        run: pnpm exec turbo run build ${{ matrix.image.filters }}
+
+      # GHCR names must be lowercase; derive them from this repo, not Kouo.
+      - name: Image prefix
+        id: image
+        run: echo "prefix=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.prefix }}-${{ matrix.image.name }}
+          # Auto adds latest only for stable semver releases, not prereleases.
+          flavor: latest=auto
+          tags: |
+            type=edge,branch=main
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=sha-
+
+      # Next standalone contains native modules built on the amd64 runner.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.image.dockerfile }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}

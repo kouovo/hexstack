@@ -1,0 +1,27 @@
+{
+  "name": "@app/bootstrap",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@app/application": "workspace:*",
+    "@app/auth": "workspace:*",
+    "@app/cache": "workspace:*",
+    "@app/context": "workspace:*",
+    "@app/persistence": "workspace:*",
+    "@app/pubsub": "workspace:*",
+    "@app/queue": "workspace:*",
+    "@app/redis": "workspace:*",
+    "@app/storage": "workspace:*"
+  },
+  "devDependencies": {
+    "@app/typescript-config": "workspace:*",
+    "@types/node": "^24.10.0"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "@app/queue",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@app/application": "workspace:*",
+    "@app/core": "workspace:*",
+    "@app/di": "workspace:*",
+    "@app/logger": "workspace:*",
+    "@app/redis": "workspace:*",
+    "bullmq": "^5.16.0"
+  },
+  "devDependencies": {
+    "@app/typescript-config": "workspace:*",
+    "@types/node": "^24.10.0"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "extends": "../../packages/typescript-config/base.json",
+  "compilerOptions": {
+    "resolveJsonModule": true
+  },
+  // tsx only applies experimentalDecorators to files matched here, so workspace sources must be included.
+  "include": ["src/**/*.ts", "*.ts", "../../packages/**/*.ts"],
+  "exclude": ["node_modules", "dist", "../../packages/**/node_modules"]
+}

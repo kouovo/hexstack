@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: app
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U app -d app" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # version comes from package.json#packageManager
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # keep in step with mise.toml
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: cp .env.example .env
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm check-types
+      - run: pnpm test
+      - run: pnpm build
+      - name: Migrate a fresh Postgres
+        run: pnpm db:migrate
