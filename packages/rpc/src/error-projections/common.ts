@@ -11,5 +11,6 @@ export const COMMON_PUBLIC_ERRORS = {
   NotFoundException: (error) => ({ _tag: error._tag, message: error.message }),
   NotImplementException: (error) => ({ _tag: error._tag, message: error.message }),
   ResourceBusyException: (error) => ({ _tag: error._tag, message: error.message }),
+  LockContentionError: (error) => ({ _tag: error._tag, message: "Resource is busy, please try again shortly." }),
   TooManyRequestsException: (error) => ({ _tag: error._tag, message: error.message }),
 } satisfies PublicErrorMap<CommonError>;
