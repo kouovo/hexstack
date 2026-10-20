@@ -1,4 +1,9 @@
-import { registerApplicationJobs, registerApplicationOutboxHandlers, registerDomainCqrsHandlers } from "@app/application";
+import {
+  registerApplicationJobs,
+  registerApplicationOutboxHandlers,
+  registerCacheInvalidation,
+  registerDomainCqrsHandlers,
+} from "@app/application";
 import { registerAuth } from "@app/auth";
 import { registerCache } from "@app/cache";
 import { registerRequestContext } from "@app/context";
@@ -34,12 +39,13 @@ export function registerDI({ enableWorkers = true }: RegisterDIOptions = {}): vo
 
   registerRedis();
   registerAuth(); // password hasher + rate limiter; before the handlers that inject them
-  registerCache();
+  registerCache(); // LOCK + CACHE
   registerObjectStorage();
   registerPubSub();
   registerQueue({ enableWorkers });
 
   registerDomainCqrsHandlers();
+  registerCacheInvalidation(); // global after-commit event handler; needs CACHE
   registerApplicationOutboxHandlers();
   registerApplicationJobs();
 }

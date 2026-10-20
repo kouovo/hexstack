@@ -341,6 +341,12 @@ importers:
       '@app/redis':
         specifier: workspace:*
         version: link:../redis
+      keyv:
+        specifier: ^5.6.0
+        version: 5.6.0
+      redlock-universal:
+        specifier: ^0.8.5
+        version: 0.8.5(ioredis@5.11.1)
     devDependencies:
       '@app/typescript-config':
         specifier: workspace:*
@@ -348,6 +354,12 @@ importers:
       '@types/node':
         specifier: ^24.10.0
         version: 24.19.2
+      ioredis:
+        specifier: ^5.4.6
+        version: 5.11.1
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.12(@types/node@24.19.2)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/context:
     dependencies:
@@ -1333,6 +1345,9 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@keyv/serialize@1.1.1':
+    resolution: {integrity: sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA==}
 
   '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4':
     resolution: {integrity: sha512-LCkGo6JDfaBhgST7UpPWgNgLINpcpabaHfyz5OBx75nUYxBsaEPxjnyNjWpeb/xBup/682QnBfRBy2/LvPutZQ==}
@@ -2660,6 +2675,9 @@ packages:
     resolution: {integrity: sha512-34wB/Y7MW7bzjKRjUKTa46I2Z7eV62Rkhva+KkopW7Qvv/OSWBqvkSY7vusOPrNuZcUG3tApvdVgNB8POj3SPw==}
     engines: {node: '>=10'}
 
+  keyv@5.6.0:
+    resolution: {integrity: sha512-CYDD3SOtsHtyXeEORYRx2qBtpDJFjRTGXUtmNEMGyzYOKj1TE3tycdlho7kA1Ufx9OYWZzg52QFBGALTirzDSw==}
+
   kysely-postgres-js@3.0.0:
     resolution: {integrity: sha512-o2t/xNSYJQDW6rVGGFPXKmZ0BEz2dGn66c2B+cO/k9ZNcU2qPWPycQPQ+B+P2MBXbKYq0xV9BZmFIvkUrmFWAQ==}
     engines: {bun: '>=1.2', node: '>=20'}
@@ -3073,6 +3091,21 @@ packages:
   redis-parser@3.0.0:
     resolution: {integrity: sha512-DJnGAeenTdpMEH6uAJRK/uiyEIH9WVsUmoLwzudwGJUwZPp80PDBWPHXSAGNPwNvIXAbe7MSUB1zQFugFml66A==}
     engines: {node: '>=4'}
+
+  redlock-universal@0.8.5:
+    resolution: {integrity: sha512-LObLVwgX6sZFEDFmFqg1d3ru/ZPg5FdetmPIsImxzZsfnh/Gg1VXuRRo/B1REZzSa9xBefVu7FbKVOeO9igFDQ==}
+    engines: {node: '>=22.0.0'}
+    peerDependencies:
+      '@valkey/valkey-glide': '>=2.0.0'
+      ioredis: '>=5.0.0'
+      redis: '>=4.0.0'
+    peerDependenciesMeta:
+      '@valkey/valkey-glide':
+        optional: true
+      ioredis:
+        optional: true
+      redis:
+        optional: true
 
   reflect-metadata@0.2.2:
     resolution: {integrity: sha512-urBwgfrvVP/eAyXx4hluJivBKzuEbSQs9rKWCrCkbSxNv8mxPcUZKeuoF3Uy4mJl3Lwprp6yy5/39VWigZ4K6Q==}
@@ -3850,6 +3883,8 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
+
+  '@keyv/serialize@1.1.1': {}
 
   '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4':
     optional: true
@@ -4764,6 +4799,10 @@ snapshots:
 
   joycon@3.1.1: {}
 
+  keyv@5.6.0:
+    dependencies:
+      '@keyv/serialize': 1.1.1
+
   kysely-postgres-js@3.0.0(kysely@0.28.18)(postgres@3.4.9):
     dependencies:
       kysely: 0.28.18
@@ -5162,6 +5201,10 @@ snapshots:
   redis-parser@3.0.0:
     dependencies:
       redis-errors: 1.2.0
+
+  redlock-universal@0.8.5(ioredis@5.11.1):
+    optionalDependencies:
+      ioredis: 5.11.1
 
   reflect-metadata@0.2.2: {}
 
