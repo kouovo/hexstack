@@ -5,7 +5,7 @@ import { z } from "@app/zod";
 
 import { type CachePort, injectCache } from "../../cache";
 import { jobHandler } from "../../queue/job-handler.decorator";
-import { TODO_CACHE_NAMESPACE } from "../todo-cache";
+import { TODO_LIST_CACHE_NAMESPACE } from "../todo-cache-invalidation";
 import { type ITodoRepository, injectTodoRepo } from "../todo.repository.port";
 
 export const NOTIFY_TODO_COMPLETED_JOB_NAME = "todo.notify-completed";
@@ -41,8 +41,8 @@ export class NotifyTodoCompletedJobHandler {
       this.logger.debug({ todoId }, "todo completion already notified; skipping duplicate delivery");
       return;
     }
-    // This write bypasses command events; invalidate only after its SQL statement succeeds.
-    await this.cache.bumpVersion(TODO_CACHE_NAMESPACE);
+    // This write bypasses command events (no in-process event), so invalidate directly after the SQL statement succeeds.
+    await this.cache.bumpVersion(TODO_LIST_CACHE_NAMESPACE);
     this.logger.info({ todoId }, "todo completion notified");
   }
 }
