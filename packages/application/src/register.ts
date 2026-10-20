@@ -3,16 +3,11 @@ import { container } from "@app/di";
 
 import { SignInCommandHandler, SignOutAllCommandHandler, SignOutCommandHandler, SignUpCommandHandler } from "./auth/commands";
 import { GetCurrentUserQueryHandler } from "./auth/queries";
+import { CacheInvalidationEventsHandler } from "./cache/events";
 import { ArchiveTodoCommandHandler, CompleteTodoCommandHandler, CreateTodoCommandHandler } from "./todo/commands";
-import {
-  TodoArchivedLogEventHandler,
-  TodoCompletedLogEventHandler,
-  TodoCreatedLogEventHandler,
-  TodoArchivedCacheEventHandler,
-  TodoCompletedCacheEventHandler,
-  TodoCreatedCacheEventHandler,
-} from "./todo/events";
+import { TodoArchivedLogEventHandler, TodoCompletedLogEventHandler, TodoCreatedLogEventHandler } from "./todo/events";
 import { ListTodosQueryHandler } from "./todo/queries";
+import { registerTodoCacheInvalidation } from "./todo/todo-cache-invalidation";
 import { AssignRoleCommandHandler } from "./user/commands";
 import { UserRoleChangedLogEventHandler } from "./user/events";
 import { ListUsersQueryHandler } from "./user/queries";
@@ -38,13 +33,16 @@ export function registerDomainCqrsHandlers(): void {
   container.resolve(QueryBus).register([ListTodosQueryHandler, ListUsersQueryHandler, GetCurrentUserQueryHandler]);
   container
     .resolve(EventBus)
-    .register([
-      TodoCreatedLogEventHandler,
-      TodoCompletedLogEventHandler,
-      TodoArchivedLogEventHandler,
-      UserRoleChangedLogEventHandler,
-      TodoCreatedCacheEventHandler,
-      TodoCompletedCacheEventHandler,
-      TodoArchivedCacheEventHandler,
-    ]);
+    .register([TodoCreatedLogEventHandler, TodoCompletedLogEventHandler, TodoArchivedLogEventHandler, UserRoleChangedLogEventHandler]);
+}
+
+/**
+ * One global after-commit handler maps domain events to cache invalidations; each bounded context
+ * contributes its rules here. Needs the CACHE port (registerCache()).
+ */
+export function registerCacheInvalidation(): void {
+  const eventBus = container.resolve(EventBus);
+  const cacheInvalidationHandler = container.resolve(CacheInvalidationEventsHandler);
+  eventBus.registerGlobal(cacheInvalidationHandler);
+  registerTodoCacheInvalidation(cacheInvalidationHandler);
 }

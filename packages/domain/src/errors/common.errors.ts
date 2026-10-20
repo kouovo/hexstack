@@ -88,6 +88,19 @@ export class ResourceBusyException extends DomainError<"ResourceBusyException"> 
   readonly kind = "locked";
 }
 
+/** A distributed lock stayed held past the retry budget. Safe to retry shortly; `resource` is internal, never public. */
+export class LockContentionError extends DomainError<"LockContentionError"> {
+  readonly _tag = "LockContentionError";
+  readonly kind = "locked";
+  override readonly retryable = true;
+  constructor(
+    readonly resource: string,
+    readonly ttlMs: number,
+  ) {
+    super("Resource is busy, please try again shortly.");
+  }
+}
+
 export class TooManyRequestsException extends DomainError<"TooManyRequestsException"> {
   readonly _tag = "TooManyRequestsException";
   readonly kind = "rate-limited";
@@ -105,4 +118,5 @@ export type CommonError =
   | NotFoundException
   | NotImplementException
   | ResourceBusyException
+  | LockContentionError
   | TooManyRequestsException;

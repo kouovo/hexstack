@@ -18,12 +18,15 @@ export const serverEnvSchema = {
         .map((origin) => origin.trim())
         .filter(Boolean),
     ),
-  /** Redis cache is optional and fail-open; queue/auth Redis behavior is unchanged. */
-  CACHE_ENABLED: z
-    .enum(["true", "false"])
-    .default("true")
-    .transform((value) => value === "true"),
-  CACHE_KEY_PREFIX: z.string().trim().min(1).default("app:cache:"),
+  /** `redis` is shared by every replica; `memory` is process-local (development/single instance). Fail-open either way. */
+  CACHE_DRIVER: z.enum(["redis", "memory"]).default("redis"),
+  /** Keyv namespace: every cache, version and lock key starts with `<namespace>:`. Distinct per app/environment. */
+  CACHE_NAMESPACE: z
+    .string()
+    .trim()
+    .min(1)
+    .regex(/^[^:\s](?:.*[^:\s])?$/, "must not start/end with ':' or whitespace")
+    .default("app:cache"),
   STORAGE_DRIVER: z.enum(["local", "minio"]).default("local"),
   STORAGE_BUCKET: z
     .string()

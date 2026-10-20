@@ -1,4 +1,5 @@
 export * from "./src/cache";
+export * from "./src/lock";
 export * from "./src/storage";
 export * from "./src/outbox";
 export * from "./src/pubsub";
@@ -8,6 +9,6 @@ export * from "./src/shared/run-with-domain-events";
 export * from "./src/todo";
 export * from "./src/auth";
 export * from "./src/user";
-export { registerDomainCqrsHandlers } from "./src/register";
+export { registerCacheInvalidation, registerDomainCqrsHandlers } from "./src/register";
 export { registerApplicationJobs } from "./src/register-application-jobs";
 export { registerApplicationOutboxHandlers } from "./src/register-application-outbox-handlers";

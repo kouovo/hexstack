@@ -1,5 +1,4 @@
 export * from "./auth.errors";
-export * from "./cache.errors";
 export * from "./common.errors";
 export * from "./cqrs.errors";
 export * from "./storage.errors";
