@@ -511,7 +511,6 @@ and `KnownError` are defined in domain; HTTP/RPC status and response mappings re
 Core's generic identifier/state-machine helpers accept caller-supplied error factories rather than importing domain,
 avoiding a dependency cycle. Database/internal failures remain sanitized and retryable; configuration/CQRS faults
 are permanent and are not in the public catalog.
-See [docs/error-handling.md](docs/error-handling.md) for an example and the extension checklist.
 
 Value objects use only the small `ValueObject<TState>` base in core. Concrete value objects explicitly define their
 value getters and any string/JSON representation; passwords and password hashes keep redacted representations.
