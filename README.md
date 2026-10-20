@@ -206,7 +206,7 @@ flowchart TD
   BOOT --> APP
   BOOT --> SQL["persistence: SQL adapters"]
   BOOT --> AUTH["auth: hashing and rate limiting"]
-  BOOT --> CACHE["cache: Redis adapter"]
+  BOOT --> CACHE["cache: Keyv/Redis adapter + Redis lock"]
   BOOT --> STORAGE["storage: local / MinIO adapters"]
   CACHE --> APP
   STORAGE --> APP
@@ -250,7 +250,7 @@ packages/
   application/          use cases, repository ports, DTOs, mappers, transaction/outbox/job contracts
   persistence/          Drizzle schema, Kysely repositories, transaction manager, migrator
   auth/                 Argon2id hasher, Redis rate limiter, cookie helpers
-  cache/                Redis CachePort adapter, TTLs and versioned invalidation
+  cache/                Keyv CachePort adapter, versioned namespaces, Redis LockPort
   storage/              ObjectStoragePort adapters: local files or MinIO/S3-compatible storage
   rpc/                  oRPC routes, protected procedures, error mapping, typed client
   bootstrap/            registerDI(): infrastructure bindings and handler registration
@@ -345,7 +345,8 @@ Design it around application behavior, not around an ORM's entire API.
 | [PasswordHasher](packages/application/src/auth/password-hasher.port.ts)                | [Argon2PasswordHasher](packages/auth/src/argon2-password-hasher.ts)                                                                    |
 | [RateLimiter](packages/application/src/auth/rate-limiter.port.ts)                      | [RedisTokenBucketRateLimiter](packages/auth/src/redis-rate-limiter.ts)                                                                 |
 | [JobDispatcher](packages/application/src/queue/queue.port.ts)                          | [BullMQ adapter](packages/queue/src)                                                                                                   |
-| [CachePort](packages/application/src/cache/cache.port.ts)                              | [RedisCacheAdapter](packages/cache/src/redis-cache.adapter.ts)                                                                         |
+| [CachePort](packages/application/src/cache/cache.port.ts)                              | [KeyvCacheAdapter](packages/cache/src/keyv-cache.adapter.ts)                                                                           |
+| [LockPort](packages/application/src/lock/lock.port.ts)                                 | [RedisLockAdapter](packages/cache/src/lock.adapter.ts)                                                                                 |
 | [ObjectStoragePort](packages/application/src/storage/object-storage.port.ts)           | [Local](packages/storage/src/local-object-storage.adapter.ts) / [MinIO](packages/storage/src/minio-object-storage.adapter.ts) adapters |
 
 The same interfaces support in-memory test adapters. Mappers and simple policies do **not** need a port or DI token
@@ -481,7 +482,7 @@ packages do not define or re-export them. Subclasses carry typed fields such as 
   `EmailAlreadyRegisteredError`) and preserve the original as `cause`. Unexpected errors are rethrown unchanged.
 - **Specific failures:** domain validation uses distinct classes (`TodoTitleInvalidError`, `UserEmailInvalidError`,
   `UserRoleInvalidError`, etc.), not a generic invalid-argument or domain-error bucket. Domain invariant failures map
-  to 422; malformed storage inputs have their own tags and map to 400. Broken password-hasher/cache invariants and
+  to 422; malformed storage inputs have their own tags and map to 400. Broken password-hasher invariants and
   storage configuration faults are internal failures, never public validation messages.
 - **HTTP/RPC:** boundary catalogs (`TodoError`, `AuthError`, `UserError`, `StorageError`, `CommonError`) form `KnownError`. The shared
   [`HTTP_STATUS`](packages/rpc/src/domain-errors.ts) table maps the finite `ErrorKind` union, not every concrete tag.
@@ -758,44 +759,80 @@ Postgres is the runtime database. PGlite is a test adapter, not a second support
 
 ### Redis caching
 
-The [cache port](packages/application/src/cache/cache.port.ts) follows Kouo's core API: `get`, `set`, `delete`,
-`getOrSet`, `getOrSetVersioned`, and `bumpVersion`. [RedisCacheAdapter](packages/cache/src/redis-cache.adapter.ts)
-uses the existing Redis endpoint, not a process-local production cache. This smaller version omits Keyv,
-distributed loader locks, metrics, and negative caching; missing values and loader errors are not cached.
+Read caching has three parts:
 
-The worked example is [ListTodosQueryHandler](packages/application/src/todo/queries/list-todos.query.ts):
+- the [CachePort](packages/application/src/cache/cache.port.ts), which use cases inject;
+- [KeyvCacheAdapter](packages/cache/src/keyv-cache.adapter.ts), which stores entries through [Keyv](https://keyv.org)
+  in Redis (or in process memory);
+- [CacheInvalidationEventsHandler](packages/application/src/cache/events/cache-invalidation-events.handler.ts), one
+  after-commit event handler that turns domain events into invalidations.
+
+| Method                                                         | Behavior                                                                                        |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `get(key, options?)` / `set(key, value, ttl?)` / `delete(key)` | Plain entry access. `get` hides negative entries                                                |
+| `getOrSet(key, loader, ttl?, options?)`                        | Read-through for one entry (e.g. a detail DTO); invalidate with `delete`                        |
+| `getOrSetVersioned(namespace, loader, ttl?, options?)`         | Read-through under the namespace's current version; `options.queryKey` separates filters/limits |
+| `bumpVersion(namespace)`                                       | Increments the version: every entry of that namespace becomes unreachable at once               |
+
+`CacheGetOptions` has `queryKey`, `lock` (single-flight the loader), `emptyTtlSeconds` (negative-entry TTL; `0`
+disables) and `statsType` (log label). TTLs are in seconds.
+
+[ListTodosQueryHandler](packages/application/src/todo/queries/list-todos.query.ts) is the worked example:
 
 ```ts
-// Inside a use case with an injected CachePort:
-return cache.getOrSetVersioned("todo:list", loadDtos, 30, {
-  queryKey: JSON.stringify({ status: status ?? null, limit }),
-});
+return this.cache.getOrSetVersioned(
+  TODO_LIST_CACHE_NAMESPACE, // "todos:list"
+  loadDtos,
+  jitteredTtlSeconds(ListTodosQueryHandler.TODO_LIST_TTL_SECONDS), // 30s ±10%
+  { queryKey: todoListQueryKey({ status, limit }), lock: true, statsType: "todo-list" },
+);
 ```
 
-- Values are JSON-compatible **DTOs**, not entities, password hashes, sessions, or role decisions. `getOrSet` defaults
-  to 60 seconds; todo lists explicitly use **30 seconds**. Every data entry has a TTL.
-- Todos are currently shared. If adding owner/tenant-specific or permission-filtered reads, authorize before accessing
-  cached data and include that visibility scope in the key; do not reuse a shared key for differently authorized responses.
-- Every status/limit combination uses its own query key under the same namespace. The
-  [todo cache event handlers](packages/application/src/todo/events/todo-cache-event.handlers.ts) bump that namespace
-  **after commit** on create/complete/archive. Failed transactions do not invalidate it.
-- The [notification job](packages/application/src/todo/jobs/notify-todo-completed.job.ts) also bumps the namespace
-  after changing the notification timestamp, so the web polling sees the new value rather than a cached DTO.
-- Versions are opaque random generations, initialized atomically by a one-key Redis Lua script. A loader already in
-  flight writes only its old generation; it cannot repopulate the active cache after a successful bump. Evicting just
-  a version key also creates a new generation rather than resurrecting old entries.
-- One persistent version key exists per namespace; old data entries expire naturally. There are no wildcard key scans.
-  Use bounded resource namespaces, not an unbounded namespace per request.
-- Cache failures are **fail-open**: read failures become misses, write/invalidation failures are logged, and the database
-  remains the source of truth. Loader failures still propagate exactly once. Invalidation is best-effort, not a durable
-  consistency guarantee; process death or Redis failure can leave cached values until their TTL.
-- The cache has its own Redis connection with a 250 ms command timeout and no offline command queue. It may miss during
-  its initial connection/reconnect rather than delay business requests. This does not change auth rate limiting's
-  fail-closed behavior or BullMQ's connection policy.
+**What to cache.** Cache JSON-compatible DTOs only: never entities, password hashes, sessions or authorization
+decisions. Todos are shared by all users. For owner-, tenant- or permission-scoped reads, authorize before touching
+the cache and put the scope in the namespace or key, so differently authorized responses never share an entry.
 
-Configure `CACHE_ENABLED` and `CACHE_KEY_PREFIX` (default `app:cache:`) in `.env`. `CACHE_ENABLED=false` explicitly
-bypasses caching; it does **not** disable Redis for rate limiting or queues. Different applications/environments sharing
-Redis need distinct prefixes. There is no stampede protection; add it only if measurements justify it.
+**Keys.** A query key must cover every input that changes the result.
+[todoListQueryKey()](packages/application/src/todo/todo-list-cache-key.ts) hashes a
+[stableStringify()](packages/application/src/cache/stable-stringify.ts) of the inputs, so property order does not
+matter and keys stay short. Keep namespaces bounded (one per resource or list), not one per request.
+
+**Invalidation.** [registerCacheInvalidation()](packages/application/src/register.ts) registers the global handler on
+the event bus, and each context contributes rules. [registerTodoCacheInvalidation()](packages/application/src/todo/todo-cache-invalidation.ts)
+maps `TodoCreatedEvent`, `TodoCompletedEvent` and `TodoArchivedEvent` to `{ kind: "bump", namespace: "todos:list" }`;
+single-entry caches return `{ kind: "delete", key }` instead. In-process events are published after commit, so a
+rolled-back write never invalidates. A failing rule or invalidation is logged and does not fail the committed write.
+Writes that publish no in-process event invalidate directly: the
+[notification job](packages/application/src/todo/jobs/notify-todo-completed.job.ts) bumps the namespace after its SQL
+update succeeds.
+
+**Versions.** Each namespace has one persistent Redis counter (`<CACHE_NAMESPACE>:cver:<namespace>`, `INCR`), and
+value keys embed the current version. A load that started before a bump writes under the old version and is never read
+again; an extra bump on redelivery only costs a miss. Old entries expire by TTL, with no key scans. Redis must run with
+`maxmemory-policy noeviction` (BullMQ requires this too); an evicted counter would restart at 0.
+
+**Negative caching.** A loader that returns `undefined` or throws `NotFoundException` is cached for
+`CACHE_EMPTY_TTL_SECONDS` (30 seconds) and replayed on later reads. A replayed error is always a `NotFoundException`
+with the original message, so context-specific errors such as `TodoNotFoundError` are not cached. Other loader errors
+propagate once and are not cached.
+
+**Stampede protection.** With `lock: true`, a miss takes a per-key Redis lease through the
+[LockPort](packages/application/src/lock/lock.port.ts) ([RedisLockAdapter](packages/cache/src/lock.adapter.ts), a
+[redlock-universal](https://github.com/alexpota/redlock-universal) single-node lock that auto-extends while the
+loader runs) and re-checks the cache after acquiring it. After a bump, one replica loads and the others read its result.
+If the lease is lost mid-load, the value is returned but not written. If the lock cannot be acquired
+(`LockContentionError`) the read falls back to an unlocked load. TTL jitter spreads expiry over time.
+
+**Failures.** The cache fails open; the database remains the source of truth. Store read errors are misses, write
+errors are logged, and an unreadable version skips the cache for that call. The Redis driver uses its own connection
+with a 250 ms command timeout and no offline queue, so an outage produces misses rather than stalled requests, and the
+first reads after (re)connecting may miss. Auth rate limiting (fail-closed) and BullMQ keep their own connection
+policies. Invalidation is best effort: process death or a Redis failure can leave an entry until its TTL.
+
+**Configuration.** `CACHE_DRIVER` is `redis` (default, shared by all replicas) or `memory` (process-local; development
+or a single instance only). `CACHE_NAMESPACE` (default `app:cache`) prefixes every cache, version and lock key; give
+each application and environment sharing a Redis its own namespace. [registerCache()](packages/cache/src/register.ts)
+also binds a general-purpose `LOCK` on the shared Redis client for other use cases.
 
 ### Object storage
 
@@ -1032,8 +1069,9 @@ Tests use Vitest, not Cucumber/Gherkin. [createTestDatabase()](packages/persiste
 the production migrations to in-memory PGlite. No running Postgres or Redis is needed for the default suite.
 PGlite is single-connection: those tests do **not** prove true concurrent Postgres behavior or run Redis Lua/BullMQ.
 Verify real infrastructure, parallel requests, and browser cookie behavior as part of deployment/integration testing.
-There is no checked-in browser/e2e harness or standalone infrastructure-adapter suite. Todo cache invalidation and
-durable notifications are tested through their business use cases, rather than generic Redis, BullMQ, or storage adapters.
+There is no checked-in browser/e2e harness. Todo cache invalidation and durable notifications are tested through their
+business use cases. [Cache adapter tests](packages/cache/src/keyv-cache.adapter.test.ts) use an in-memory Keyv store;
+no suite runs against a real Redis, BullMQ, or storage backend.
 
 [CI](.github/workflows/ci.yml) installs with a frozen lockfile, checks lint/format/types, runs tests, builds the apps,
 and applies migrations to a fresh Postgres service.
@@ -1047,7 +1085,8 @@ Use `todo` as a worked example, not a requirement to duplicate every mechanism. 
    Add an event per file in `events/`; add specifications and matching visitor methods only for needed filters.
 2. **Application:** copy [application/src/todo](packages/application/src/todo). Define its port/record, DTO, plain-object
    mapper, and focused command/query handlers. Export through [application/index.ts](packages/application/index.ts).
-   Register command/query/in-process event handlers in [register.ts](packages/application/src/register.ts).
+   Register command/query/in-process event handlers in [register.ts](packages/application/src/register.ts). If the
+   context caches reads, add a `registerXCacheInvalidation()` rule set and call it from `registerCacheInvalidation()`.
 3. **Durable work, if needed:** register outbox consumers in
    [register-application-outbox-handlers.ts](packages/application/src/register-application-outbox-handlers.ts), declare
    their event types in [durable-event-types.ts](packages/application/src/outbox/durable-event-types.ts), and add the
@@ -1112,10 +1151,9 @@ The apps obtain registrations through the composition root; do not add feature-s
   extra mapping, or durable messaging when they do not solve an actual problem.
 
 Not included: password recovery, email verification, breached-password screening, MFA, OAuth/passkeys, tenant/ownership
-policies, durable security auditing, a file ownership/upload-finalization domain, mail, cache stampede protection,
-OpenTelemetry, realtime, GraphQL/OpenAPI,
-a complete production deployment stack, a UI component library, or a checked-in browser/e2e suite. This is an auth foundation,
-not a complete identity provider or a production deployment platform.
+policies, durable security auditing, a file ownership/upload-finalization domain, mail, OpenTelemetry, realtime,
+GraphQL/OpenAPI, a complete production deployment stack, a UI component library, or a checked-in browser/e2e suite.
+This is an auth foundation, not a complete identity provider or a production deployment platform.
 
 ## Further reading
 
