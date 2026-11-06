@@ -12,7 +12,15 @@ import {
   TodoMapper,
 } from "@app/application";
 import { DomainError } from "@app/core";
-import { TodoEntity, TodoId, TodoIdSpecification, TodoStatus, TodoStatusSpecification, TodoTitle } from "@app/domain";
+import {
+  TodoEntity,
+  TodoId,
+  TodoIdSpecification,
+  TodoStatus,
+  TodoStatusSpecification,
+  TodoTitle,
+  TodoTitleSpecification,
+} from "@app/domain";
 import { afterAll, beforeAll, beforeEach, expect, test } from "vitest";
 
 import { OUTBOX_TABLE, TODO_TABLE } from "../db";
@@ -56,7 +64,7 @@ function handlers() {
 }
 
 test("round-trips an entity through the table", async () => {
-  const todo = TodoEntity.create({ title: TodoTitle.create("persist me") });
+  const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create("persist me")));
   await repo.insert(todo);
   const loaded = await repo.findOne(new TodoIdSpecification(todo.id));
   expect(loaded?.title.value).toBe("persist me");
@@ -66,7 +74,7 @@ test("round-trips an entity through the table", async () => {
 
 test("toPersistence -> SQL -> toEntity round-trips every column", async () => {
   const at = new Date("2024-01-01T00:00:00.000Z");
-  const todo = TodoEntity.create({ title: TodoTitle.create("columns"), createdAt: at });
+  const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create("columns")), at);
   todo.complete(at);
   await repo.insert(todo);
   const loaded = await repo.findOne(new TodoIdSpecification(todo.id));
@@ -74,7 +82,7 @@ test("toPersistence -> SQL -> toEntity round-trips every column", async () => {
 });
 
 test("specifications are translated to SQL, including and / or / not", async () => {
-  const [a, b, c] = ["a", "b", "c"].map((title) => TodoEntity.create({ title: TodoTitle.create(title) }));
+  const [a, b, c] = ["a", "b", "c"].map((title) => TodoEntity.create(new TodoTitleSpecification(TodoTitle.create(title))));
   for (const todo of [a!, b!, c!]) await repo.insert(todo);
   b!.complete();
   await repo.updateIfStatus(b!, "open");
@@ -94,7 +102,7 @@ test("specifications are translated to SQL, including and / or / not", async () 
 });
 
 test("updateIfStatus only wins against the expected stored status", async () => {
-  const todo = TodoEntity.create({ title: TodoTitle.create("race") });
+  const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create("race")));
   await repo.insert(todo);
   todo.complete();
   expect(await repo.updateIfStatus(todo, "open")).toBe(true);
@@ -104,7 +112,7 @@ test("updateIfStatus only wins against the expected stored status", async () => 
 });
 
 test("markCompletionNotified succeeds once, and only for completed todos", async () => {
-  const todo = TodoEntity.create({ title: TodoTitle.create("notify") });
+  const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create("notify")));
   await repo.insert(todo);
   expect(await repo.markCompletionNotified(todo.id, new Date())).toBe(false);
   todo.complete();
@@ -180,7 +188,7 @@ class ExpectedFailure extends DomainError<"ExpectedFailure"> {
 test("a thrown domain error after a write rolls the real transaction back: no todo row, no outbox row", async () => {
   const transaction = new ApplicationTransactionAdapter(db.transactions);
   const outbox = new OutboxService(outboxRepo);
-  const todo = TodoEntity.create({ title: TodoTitle.create("never committed") });
+  const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create("never committed")));
   todo.clearDomainEvents();
   todo.complete();
 

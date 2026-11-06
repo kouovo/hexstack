@@ -1,11 +1,11 @@
-import { TodoEntity, TodoTitle } from "@app/domain";
+import { TodoEntity, TodoTitle, TodoTitleSpecification } from "@app/domain";
 import { expect, test } from "vitest";
 
 import { TodoMapper } from "./todo.mapper";
 
 const at = new Date("2024-01-01T00:00:00.000Z");
 function completedTodo() {
-  const todo = TodoEntity.create({ title: TodoTitle.create("map me"), createdAt: at });
+  const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create("map me")), at);
   todo.complete(at);
   return todo;
 }

@@ -1,6 +1,5 @@
-import { NotImplementException } from "../../errors/common.errors";
 import type { TodoId } from "../todo-id.value-object";
-import type { TodoEntity } from "../todo.entity";
+import type { ITodoState, TodoEntity } from "../todo.entity";
 import type { ITodoSpecVisitor } from "../todo.type";
 import { TodoSpecification } from "./todo.specification";
 
@@ -13,8 +12,8 @@ export class TodoIdSpecification extends TodoSpecification {
     return todo.id.equals(this.id);
   }
 
-  mutate(_todo: TodoEntity): TodoEntity {
-    throw new NotImplementException();
+  override create(state: ITodoState): ITodoState {
+    return { ...state, id: this.id };
   }
 
   accept(visitor: ITodoSpecVisitor): void {

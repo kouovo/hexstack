@@ -2,9 +2,10 @@ import { AggregateRoot, type IEntityState } from "@app/core";
 
 import { TodoTransitionNotAllowedError } from "../errors/todo.errors";
 import { TodoArchivedEvent, TodoCompletedEvent, TodoCreatedEvent } from "./events";
+import type { TodoSpecification } from "./specs/todo.specification";
 import { TodoId } from "./todo-id.value-object";
 import { TodoStatus, type TodoStatusValue } from "./todo-status.value-object";
-import { TodoTitle } from "./todo-title.value-object";
+import type { TodoTitle } from "./todo-title.value-object";
 
 export interface ITodoState extends IEntityState<TodoId> {
   title: TodoTitle;
@@ -15,12 +16,6 @@ export interface ITodoState extends IEntityState<TodoId> {
   createdAt: Date;
   updatedAt: Date;
 }
-
-export type CreateTodoProps = {
-  title: TodoTitle;
-  id?: TodoId;
-  createdAt?: Date;
-};
 
 export class TodoEntity extends AggregateRoot<ITodoState> {
   get title(): TodoTitle {
@@ -47,17 +42,21 @@ export class TodoEntity extends AggregateRoot<ITodoState> {
     return this.state.updatedAt;
   }
 
-  static create(props: CreateTodoProps): TodoEntity {
-    const now = props.createdAt ?? new Date();
-    const todo = new TodoEntity({
-      id: props.id ?? TodoId.generate(),
-      title: props.title,
+  /**
+   * Builds a new todo from specifications: the defaults below, then each spec writes its own value
+   * (e.g. `new TodoTitleSpecification(title).and(new TodoIdSpecification(id))`).
+   * The title has no default; callers must pass a TodoTitleSpecification (the command schema guarantees one).
+   */
+  static create(spec: TodoSpecification, at = new Date()): TodoEntity {
+    const state = spec.create({
+      id: TodoId.generate(),
       status: TodoStatus.open(),
       completedAt: null,
       completionNotifiedAt: null,
-      createdAt: now,
-      updatedAt: now,
-    });
+      createdAt: at,
+      updatedAt: at,
+    } as ITodoState);
+    const todo = new TodoEntity(state);
     todo.addDomainEvent(new TodoCreatedEvent({ aggregateId: todo.id.value, title: todo.title.value }));
     return todo;
   }

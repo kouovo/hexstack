@@ -2,10 +2,11 @@ import { describe, expect, test } from "vitest";
 
 import { TodoTransitionNotAllowedError, TodoTitleInvalidError } from "../errors/todo.errors";
 import { TodoArchivedEvent, TodoCompletedEvent, TodoCreatedEvent } from "./events";
+import { TodoTitleSpecification } from "./specs/todo-title.specification";
 import { TodoTitle } from "./todo-title.value-object";
 import { TodoEntity } from "./todo.entity";
 
-const newTodo = () => TodoEntity.create({ title: TodoTitle.create("Write the README") });
+const newTodo = () => TodoEntity.create(new TodoTitleSpecification(TodoTitle.create("Write the README")));
 
 describe(TodoEntity.name, () => {
   test("create starts open and records TodoCreatedEvent", () => {
