@@ -3,13 +3,17 @@ import { describe, expect, test } from "vitest";
 import { UserEmailInvalidError, UserRoleInvalidError } from "../errors/user.errors";
 import { UserRoleChangedEvent, UserSignedUpEvent } from "./events";
 import { PasswordHash } from "./password-hash.value-object";
-import { UserEmailSpecification } from "./specs";
+import { UserEmailSpecification, UserPasswordHashSpecification } from "./specs";
 import { UserEmail } from "./user-email.value-object";
 import { UserRole } from "./user-role.value-object";
 import { UserEntity } from "./user.entity";
 
 const newUser = () =>
-  UserEntity.signUp({ email: UserEmail.create("  Ada@Example.COM "), passwordHash: PasswordHash.rehydrate("$argon2id$stub") });
+  UserEntity.signUp(
+    new UserEmailSpecification(UserEmail.create("  Ada@Example.COM ")).and(
+      new UserPasswordHashSpecification(PasswordHash.rehydrate("$argon2id$stub")),
+    ),
+  );
 
 describe(UserEntity.name, () => {
   test("sign-up normalises the email, defaults to member, records UserSignedUpEvent", () => {

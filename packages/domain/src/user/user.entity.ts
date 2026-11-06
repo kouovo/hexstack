@@ -2,6 +2,7 @@ import { AggregateRoot, type IEntityState } from "@app/core";
 
 import { UserRoleChangedEvent, UserSignedUpEvent } from "./events";
 import type { PasswordHash } from "./password-hash.value-object";
+import type { UserSpecification } from "./specs/user.specification";
 import type { UserEmail } from "./user-email.value-object";
 import { UserId } from "./user-id.value-object";
 import { UserRole } from "./user-role.value-object";
@@ -36,16 +37,19 @@ export class UserEntity extends AggregateRoot<IUserState> {
     return this.state.updatedAt;
   }
 
-  static signUp(props: { email: UserEmail; passwordHash: PasswordHash; role?: UserRole; at?: Date }): UserEntity {
-    const now = props.at ?? new Date();
-    const user = new UserEntity({
+  /**
+   * Builds a new user from specifications: the defaults below, then each spec writes its own value.
+   * Email and password hash have no default; callers pass UserEmailSpecification and
+   * UserPasswordHashSpecification (the sign-up handler always does).
+   */
+  static signUp(spec: UserSpecification, at = new Date()): UserEntity {
+    const state = spec.create({
       id: UserId.generate(),
-      email: props.email,
-      passwordHash: props.passwordHash,
-      role: props.role ?? UserRole.default(),
-      createdAt: now,
-      updatedAt: now,
-    });
+      role: UserRole.default(),
+      createdAt: at,
+      updatedAt: at,
+    } as IUserState);
+    const user = new UserEntity(state);
     user.addDomainEvent(new UserSignedUpEvent({ aggregateId: user.id.value, email: user.email.value }));
     return user;
   }

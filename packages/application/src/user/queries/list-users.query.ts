@@ -1,7 +1,7 @@
 import { specificationBuilder } from "@app/core";
 import { type IQueryHandler, Query, queryHandler } from "@app/cqrs";
 import { singleton } from "@app/di";
-import { type IUserSpecVisitor, UserEmail, UserEmailSpecification, userEmailSchema, type UserEntity } from "@app/domain";
+import { type IUserSpecVisitor, type IUserState, UserEmail, UserEmailSpecification, userEmailSchema, type UserEntity } from "@app/domain";
 import { z } from "@app/zod";
 
 import type { IUserDTO } from "../user.dto";
@@ -33,7 +33,9 @@ export class ListUsersQueryHandler implements IQueryHandler<ListUsersQuery, IUse
   constructor(@injectUserRepo() private readonly userRepo: IUserRepository) {}
 
   async execute(query: ListUsersQuery): Promise<IUserDTO[]> {
-    const spec = specificationBuilder<UserEntity, IUserSpecVisitor>().add(query.email, UserEmail.create, UserEmailSpecification).build();
+    const spec = specificationBuilder<UserEntity, IUserSpecVisitor, IUserState>()
+      .add(query.email, UserEmail.create, UserEmailSpecification)
+      .build();
     const users = await this.userRepo.find(spec, { limit: query.limit });
     return users.map((user) => UserMapper.toResponse(user));
   }

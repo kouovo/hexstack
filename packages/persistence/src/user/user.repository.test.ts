@@ -1,5 +1,14 @@
 import { SessionService, SignUpCommand, SignUpCommandHandler, UserMapper } from "@app/application";
-import { PasswordHash, UserEmail, UserEmailSpecification, UserEntity, UserId, UserIdSpecification, UserRole } from "@app/domain";
+import {
+  PasswordHash,
+  UserEmail,
+  UserEmailSpecification,
+  UserEntity,
+  UserId,
+  UserIdSpecification,
+  UserPasswordHashSpecification,
+  UserRole,
+} from "@app/domain";
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from "vitest";
 
 import { SESSION_TABLE, USER_TABLE } from "../db";
@@ -27,7 +36,9 @@ afterAll(async () => {
 });
 
 const newUser = (email = "ada@example.com") =>
-  UserEntity.signUp({ email: UserEmail.create(email), passwordHash: PasswordHash.rehydrate("$argon2id$stub") });
+  UserEntity.signUp(
+    new UserEmailSpecification(UserEmail.create(email)).and(new UserPasswordHashSpecification(PasswordHash.rehydrate("$argon2id$stub"))),
+  );
 
 test("users round-trip and are found by id / email specs", async () => {
   const user = newUser();

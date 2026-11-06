@@ -1,4 +1,11 @@
-import type { IUserSpecVisitor, UserEmailSpecification, UserEntity, UserIdSpecification } from "@app/domain";
+import type {
+  IUserSpecVisitor,
+  UserEmailSpecification,
+  UserEntity,
+  UserIdSpecification,
+  UserPasswordHashSpecification,
+  UserRoleSpecification,
+} from "@app/domain";
 import type { ExpressionBuilder } from "kysely";
 
 import type { Database, USER_TABLE } from "../db";
@@ -21,5 +28,13 @@ export class UserQueryVisitor extends QueryVisitor<UserEntity, Database, UserTab
 
   email(spec: UserEmailSpecification): void {
     this.addCond(this.eb("email", "=", spec.email.value));
+  }
+
+  passwordHash(spec: UserPasswordHashSpecification): void {
+    this.addCond(this.eb("password_hash", "=", spec.passwordHash.value));
+  }
+
+  role(spec: UserRoleSpecification): void {
+    this.addCond(this.eb("role", "=", spec.role.value));
   }
 }
