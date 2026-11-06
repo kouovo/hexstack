@@ -3,14 +3,16 @@ import { PassThrough } from "node:stream";
 import { USER_REPO } from "@app/application";
 import { CommandBus } from "@app/cqrs";
 import { type InjectionToken } from "@app/di";
-import { PasswordHash, UserEmail, UserEntity } from "@app/domain";
+import { PasswordHash, UserEmail, UserEmailSpecification, UserEntity, UserPasswordHashSpecification } from "@app/domain";
 import { expect, test, vi } from "vitest";
 
 import type { CliServices } from "../context";
 import { createCli } from "../create-cli";
 
 function setup(found = true) {
-  const user = UserEntity.signUp({ email: UserEmail.create("ada@example.com"), passwordHash: PasswordHash.rehydrate("$stub") });
+  const user = UserEntity.signUp(
+    new UserEmailSpecification(UserEmail.create("ada@example.com")).and(new UserPasswordHashSpecification(PasswordHash.rehydrate("$stub"))),
+  );
   const execute = vi.fn(async () => ({ id: user.id.value, email: user.email.value, role: "admin" }));
   const findOne = vi.fn(async () => (found ? user : undefined));
   const resolve = vi.fn(async (token: InjectionToken<unknown>): Promise<unknown> => {

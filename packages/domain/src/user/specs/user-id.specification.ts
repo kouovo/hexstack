@@ -1,6 +1,5 @@
-import { NotImplementException } from "../../errors/common.errors";
 import type { UserId } from "../user-id.value-object";
-import type { UserEntity } from "../user.entity";
+import type { IUserState, UserEntity } from "../user.entity";
 import type { IUserSpecVisitor } from "../user.type";
 import { UserSpecification } from "./user.specification";
 
@@ -13,8 +12,8 @@ export class UserIdSpecification extends UserSpecification {
     return user.id.equals(this.id);
   }
 
-  mutate(_user: UserEntity): UserEntity {
-    throw new NotImplementException();
+  override create(state: IUserState): IUserState {
+    return { ...state, id: this.id };
   }
 
   accept(visitor: IUserSpecVisitor): void {

@@ -1,6 +1,6 @@
 import { Command, commandHandler, type ICommandHandler, type IEventBus, injectEventBus } from "@app/cqrs";
 import { singleton } from "@app/di";
-import { TodoEntity, TodoTitle, todoTitleSchema } from "@app/domain";
+import { TodoEntity, TodoTitle, TodoTitleSpecification, todoTitleSchema } from "@app/domain";
 import { z } from "@app/zod";
 
 import { type IOutboxService, injectOutboxService } from "../../outbox";
@@ -36,7 +36,7 @@ export class CreateTodoCommandHandler implements ICommandHandler<CreateTodoComma
   ) {}
 
   async execute(command: CreateTodoCommand): Promise<ITodoDTO> {
-    const todo = TodoEntity.create({ title: TodoTitle.create(command.title) });
+    const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create(command.title)));
 
     await runWithDomainEvents(this.transaction, this.outboxService, this.eventBus, async () => {
       await this.todoRepo.insert(todo);

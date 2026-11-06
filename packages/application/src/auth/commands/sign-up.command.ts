@@ -7,6 +7,7 @@ import {
   UserEmailSpecification,
   userEmailSchema,
   UserEntity,
+  UserPasswordHashSpecification,
   EmailAlreadyRegisteredError,
   RateLimitedError,
 } from "@app/domain";
@@ -66,12 +67,13 @@ export class SignUpCommandHandler implements ICommandHandler<SignUpCommand, Auth
     const email = UserEmail.create(command.email); // already validated by the command schema
     const password = Password.parse(command.password); // the domain enforces the password policy
     // Explicit message (no enumeration hiding): the unique index still guards the race below.
-    if (await this.users.findOne(new UserEmailSpecification(email))) {
+    const emailSpec = new UserEmailSpecification(email);
+    if (await this.users.findOne(emailSpec)) {
       throw new EmailAlreadyRegisteredError({ detectedBy: "lookup" });
     }
 
     const passwordHash = await this.hasher.hash(password); // outside the transaction: slow
-    const user = UserEntity.signUp({ email, passwordHash });
+    const user = UserEntity.signUp(emailSpec.and(new UserPasswordHashSpecification(passwordHash)));
 
     // Account + first session commit together; a thrown duplicate rolls both back.
     const { session, token } = await runWithDomainEvents(this.transaction, this.outboxService, this.eventBus, async () => {

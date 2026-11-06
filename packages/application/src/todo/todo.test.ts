@@ -1,4 +1,12 @@
-import { TodoCompletedEvent, TodoEntity, type TodoId, type TodoSpecification, type TodoStatusValue, TodoTitle } from "@app/domain";
+import {
+  TodoCompletedEvent,
+  TodoEntity,
+  type TodoId,
+  type TodoSpecification,
+  type TodoStatusValue,
+  TodoTitle,
+  TodoTitleSpecification,
+} from "@app/domain";
 import { describe, expect, test, vi } from "vitest";
 
 import { uncached } from "../cache/cache.test-helper";
@@ -165,7 +173,7 @@ describe("todo async flow", () => {
 
   test("job handler is idempotent: a redelivered job does not notify twice", async () => {
     const repo = new InMemoryTodoRepository();
-    const todo = TodoEntity.create({ title: TodoTitle.create("x") });
+    const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create("x")));
     await repo.insert(todo);
     todo.complete();
     await repo.updateIfStatus(todo, "open");

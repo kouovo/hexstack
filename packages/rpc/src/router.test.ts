@@ -13,7 +13,16 @@ import {
 } from "@app/application";
 import { type RequestPrincipal, requestContextStorage } from "@app/context";
 import { container } from "@app/di";
-import { PasswordHash, type TodoEntity, UserEmail, UserEntity, UserRole } from "@app/domain";
+import {
+  PasswordHash,
+  type TodoEntity,
+  UserEmail,
+  UserEmailSpecification,
+  UserEntity,
+  UserPasswordHashSpecification,
+  UserRole,
+  UserRoleSpecification,
+} from "@app/domain";
 import { createRouterClient } from "@orpc/server";
 import { beforeAll, describe, expect, test, vi } from "vitest";
 
@@ -39,11 +48,11 @@ const userRepo: IUserRepository = {
 };
 
 function seedUser(role: string): RequestPrincipal {
-  const user = UserEntity.signUp({
-    email: UserEmail.create(`${role}-${users.size}@example.com`),
-    passwordHash: PasswordHash.rehydrate("$stub"),
-    role: UserRole.create(role),
-  });
+  const user = UserEntity.signUp(
+    new UserEmailSpecification(UserEmail.create(`${role}-${users.size}@example.com`))
+      .and(new UserPasswordHashSpecification(PasswordHash.rehydrate("$stub")))
+      .and(new UserRoleSpecification(UserRole.create(role))),
+  );
   users.set(user.id.value, user);
   return { userId: user.id.value, sessionId: `sess-${role}`, role };
 }

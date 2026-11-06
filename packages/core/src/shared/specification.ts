@@ -5,36 +5,44 @@ export interface ISpecVisitor {
   clone(): this;
 }
 
-export interface ISpecification<T = unknown, V extends ISpecVisitor = ISpecVisitor> {
+/**
+ * T: the entity it matches. V: the visitor that translates it (e.g. to SQL).
+ * S: the state it can build; `create` writes this spec's value onto S (see the entity factories).
+ */
+export interface ISpecification<T = unknown, V extends ISpecVisitor = ISpecVisitor, S = unknown> {
   isSatisfiedBy(t: T): boolean;
-  mutate(t: T): T;
+  create(state: S): S;
   accept(v: V): void;
 }
 
-export abstract class Specification<T = unknown, V extends ISpecVisitor = ISpecVisitor> implements ISpecification<T, V> {
+export abstract class Specification<T = unknown, V extends ISpecVisitor = ISpecVisitor, S = unknown> implements ISpecification<T, V, S> {
   abstract isSatisfiedBy(t: T): boolean;
-  abstract mutate(t: T): T;
   abstract accept(v: V): void;
 
-  public and(s: ISpecification<T, V>): Specification<T, V> {
+  /** Specs that take part in creation override this; the rest leave the state unchanged. */
+  create(state: S): S {
+    return state;
+  }
+
+  public and(s: ISpecification<T, V, S>): Specification<T, V, S> {
     return new And(this, s);
   }
 
-  public or(s: ISpecification<T, V>): Specification<T, V> {
+  public or(s: ISpecification<T, V, S>): Specification<T, V, S> {
     return new Or(this, s);
   }
 
-  public not(): Not<T, V> {
+  public not(): Not<T, V, S> {
     return new Not(this);
   }
 }
 
 export { Specification as CompositeSpecification };
 
-class And<T, V extends ISpecVisitor> extends Specification<T, V> {
+class And<T, V extends ISpecVisitor, S> extends Specification<T, V, S> {
   constructor(
-    private readonly left: ISpecification<T, V>,
-    private readonly right: ISpecification<T, V>,
+    private readonly left: ISpecification<T, V, S>,
+    private readonly right: ISpecification<T, V, S>,
   ) {
     super();
   }
@@ -43,8 +51,8 @@ class And<T, V extends ISpecVisitor> extends Specification<T, V> {
     return this.left.isSatisfiedBy(t) && this.right.isSatisfiedBy(t);
   }
 
-  mutate(t: T): T {
-    return this.right.mutate(this.left.mutate(t));
+  override create(state: S): S {
+    return this.right.create(this.left.create(state));
   }
 
   accept(v: V): void {
@@ -52,10 +60,10 @@ class And<T, V extends ISpecVisitor> extends Specification<T, V> {
   }
 }
 
-class Or<T, V extends ISpecVisitor> extends Specification<T, V> {
+class Or<T, V extends ISpecVisitor, S> extends Specification<T, V, S> {
   constructor(
-    private readonly left: ISpecification<T, V>,
-    private readonly right: ISpecification<T, V>,
+    private readonly left: ISpecification<T, V, S>,
+    private readonly right: ISpecification<T, V, S>,
   ) {
     super();
   }
@@ -64,21 +72,13 @@ class Or<T, V extends ISpecVisitor> extends Specification<T, V> {
     return this.left.isSatisfiedBy(t) || this.right.isSatisfiedBy(t);
   }
 
-  mutate(t: T): T {
-    try {
-      return this.left.mutate(t);
-    } catch {
-      return this.right.mutate(t);
-    }
-  }
-
   accept(v: V): void {
     v.or(this.left, this.right);
   }
 }
 
-export class Not<T, V extends ISpecVisitor> extends Specification<T, V> {
-  constructor(public readonly spec: ISpecification<T, V>) {
+export class Not<T, V extends ISpecVisitor, S> extends Specification<T, V, S> {
+  constructor(public readonly spec: ISpecification<T, V, S>) {
     super();
   }
 
@@ -86,16 +86,12 @@ export class Not<T, V extends ISpecVisitor> extends Specification<T, V> {
     return !this.spec.isSatisfiedBy(t);
   }
 
-  mutate(): T {
-    throw new Error("[Not.mutate] Method not implemented.");
-  }
-
   accept(v: V): void {
     v.not(this.spec);
   }
 }
 
-export const and = <T, V extends ISpecVisitor>(...specs: Specification<T, V>[]): Specification<T, V> | undefined => {
+export const and = <T, V extends ISpecVisitor, S>(...specs: Specification<T, V, S>[]): Specification<T, V, S> | undefined => {
   const [first, ...rest] = specs;
 
   if (!first) return undefined;
@@ -110,13 +106,13 @@ export const and = <T, V extends ISpecVisitor>(...specs: Specification<T, V>[]):
 
 const isDefined = <T>(value: T | undefined): value is T => value !== undefined;
 
-export const andDefined = <T, V extends ISpecVisitor>(
-  ...specs: Array<Specification<T, V> | undefined>
-): Specification<T, V> | undefined => {
+export const andDefined = <T, V extends ISpecVisitor, S>(
+  ...specs: Array<Specification<T, V, S> | undefined>
+): Specification<T, V, S> | undefined => {
   return and(...specs.filter(isDefined));
 };
 
-export const or = <T, V extends ISpecVisitor>(...specs: Specification<T, V>[]): Specification<T, V> | undefined => {
+export const or = <T, V extends ISpecVisitor, S>(...specs: Specification<T, V, S>[]): Specification<T, V, S> | undefined => {
   const [first, ...rest] = specs;
 
   if (!first) return undefined;
@@ -129,17 +125,19 @@ export const or = <T, V extends ISpecVisitor>(...specs: Specification<T, V>[]): 
   return s;
 };
 
-export const orDefined = <T, V extends ISpecVisitor>(...specs: Array<Specification<T, V> | undefined>): Specification<T, V> | undefined => {
+export const orDefined = <T, V extends ISpecVisitor, S>(
+  ...specs: Array<Specification<T, V, S> | undefined>
+): Specification<T, V, S> | undefined => {
   return or(...specs.filter(isDefined));
 };
 
-export class SpecificationBuilder<T, V extends ISpecVisitor> {
-  private readonly specs: Specification<T, V>[] = [];
+export class SpecificationBuilder<T, V extends ISpecVisitor, S = unknown> {
+  private readonly specs: Specification<T, V, S>[] = [];
 
   add<Input, Value>(
     input: Input | undefined,
     createValue: (input: Input) => Value,
-    createSpec: new (value: Value) => Specification<T, V>,
+    createSpec: new (value: Value) => Specification<T, V, S>,
   ): this {
     if (input === undefined) return this;
 
@@ -148,18 +146,18 @@ export class SpecificationBuilder<T, V extends ISpecVisitor> {
     return this;
   }
 
-  addValue<Value>(input: Value | undefined, createSpec: new (value: Value) => Specification<T, V>): this {
+  addValue<Value>(input: Value | undefined, createSpec: new (value: Value) => Specification<T, V, S>): this {
     if (input === undefined) return this;
 
     this.specs.push(new createSpec(input));
     return this;
   }
 
-  build(): Specification<T, V> | undefined {
+  build(): Specification<T, V, S> | undefined {
     return and(...this.specs);
   }
 
-  required(emptyError: Error): Specification<T, V> {
+  required(emptyError: Error): Specification<T, V, S> {
     const spec = this.build();
     if (!spec) throw emptyError;
 
@@ -167,6 +165,6 @@ export class SpecificationBuilder<T, V extends ISpecVisitor> {
   }
 }
 
-export const specificationBuilder = <T, V extends ISpecVisitor>(): SpecificationBuilder<T, V> => {
-  return new SpecificationBuilder<T, V>();
+export const specificationBuilder = <T, V extends ISpecVisitor, S = unknown>(): SpecificationBuilder<T, V, S> => {
+  return new SpecificationBuilder<T, V, S>();
 };

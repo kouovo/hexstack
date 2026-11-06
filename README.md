@@ -455,6 +455,16 @@ const spec = new TodoIdSpecification(TodoId.create("todo_example")).and(new Todo
 - Repository reads accept `findOne(spec)` or `find(spec | undefined, { limit })`.
 - [ListTodosQuery](packages/application/src/todo/queries/list-todos.query.ts) uses `specificationBuilder()` to AND
   optional filters, skipping undefined values.
+- The same specs build new entities: `create(state)` writes the spec's value onto the factory defaults (`And` applies
+  both sides; specs that do not override it, such as `TodoStatusSpecification`, leave the state unchanged):
+
+  ```ts
+  const spec = new TodoTitleSpecification(title);
+  const todo = (await repo.findOne(spec)) ?? TodoEntity.create(spec);
+  ```
+
+  Required values without a default (todo title, user email and password hash) are guaranteed by the command schema
+  and handler, not re-checked in the factory.
 
 Add a visitor method and SQL implementation for every new spec. Avoid accepting arbitrary column names or SQL
 fragments in a domain specification.

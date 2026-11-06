@@ -1,4 +1,4 @@
-import type { ITodoSpecVisitor, TodoEntity, TodoIdSpecification, TodoStatusSpecification } from "@app/domain";
+import type { ITodoSpecVisitor, TodoEntity, TodoIdSpecification, TodoStatusSpecification, TodoTitleSpecification } from "@app/domain";
 import type { ExpressionBuilder } from "kysely";
 
 import type { Database, TODO_TABLE } from "../db";
@@ -18,6 +18,10 @@ export class TodoQueryVisitor extends QueryVisitor<TodoEntity, Database, TodoTab
 
   id(spec: TodoIdSpecification): void {
     this.addCond(this.eb("id", "=", spec.id.value));
+  }
+
+  title(spec: TodoTitleSpecification): void {
+    this.addCond(this.eb("title", "=", spec.title.value));
   }
 
   status(spec: TodoStatusSpecification): void {

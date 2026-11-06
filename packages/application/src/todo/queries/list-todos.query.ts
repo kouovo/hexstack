@@ -1,7 +1,14 @@
 import { specificationBuilder } from "@app/core";
 import { type IQueryHandler, Query, queryHandler } from "@app/cqrs";
 import { singleton } from "@app/di";
-import { type ITodoSpecVisitor, type TodoEntity, TodoStatus, TodoStatusSpecification, todoStatusSchema } from "@app/domain";
+import {
+  type ITodoSpecVisitor,
+  type ITodoState,
+  type TodoEntity,
+  TodoStatus,
+  TodoStatusSpecification,
+  todoStatusSchema,
+} from "@app/domain";
 import { z } from "@app/zod";
 
 import { type CachePort, injectCache, jitteredTtlSeconds } from "../../cache";
@@ -46,7 +53,7 @@ export class ListTodosQueryHandler implements IQueryHandler<ListTodosQuery, ITod
       TODO_LIST_CACHE_NAMESPACE,
       async () => {
         // Cache DTOs, never live entities; preserve the same spec-based read on a miss.
-        const spec = specificationBuilder<TodoEntity, ITodoSpecVisitor>()
+        const spec = specificationBuilder<TodoEntity, ITodoSpecVisitor, ITodoState>()
           .add(query.status, TodoStatus.create, TodoStatusSpecification)
           .build();
         const todos = await this.todoRepo.find(spec, { limit: query.limit });
