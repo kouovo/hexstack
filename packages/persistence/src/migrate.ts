@@ -5,7 +5,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate as drizzleMigrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
-import { requirePostgresUrl } from "./client";
+import { requireDirectPostgresUrl } from "./client";
 
 const logger = createLogger("migrate");
 
@@ -20,9 +20,10 @@ export type MigrateOptions = {
 /**
  * Applies pending migrations under a session-level advisory lock so concurrent deploys
  * (several replicas / a Helm hook racing a manual run) apply each migration exactly once.
+ * Session locks do not survive a transaction-mode pooler, so this uses POSTGRES_DIRECT_URL.
  */
 export async function migrate({ migrationsRoot = "./drizzle" }: MigrateOptions = {}): Promise<void> {
-  const pg = postgres(requirePostgresUrl(), { max: 1, onnotice: () => {} });
+  const pg = postgres(requireDirectPostgresUrl(), { max: 1, onnotice: () => {} });
   try {
     await pg`SELECT pg_advisory_lock(${MIGRATION_ADVISORY_LOCK_KEY})`;
     const migrationsFolder = join(migrationsRoot, "postgres");

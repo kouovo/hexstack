@@ -33,6 +33,8 @@
       "env": [
         "PORT",
         "POSTGRES_URL",
+        "POSTGRES_DIRECT_URL",
+        "POSTGRES_PREPARE",
         "REDIS_URL",
         "LOG_LEVEL",
         "CORS_ORIGINS",

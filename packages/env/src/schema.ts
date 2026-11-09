@@ -42,7 +42,15 @@ export const serverEnvSchema = {
     .enum(["true", "false"])
     .default("false")
     .transform((value) => value === "true"),
+  /** App connection string. May point at a transaction-mode pooler such as PgBouncer. */
   POSTGRES_URL: z.string().optional(),
+  /** Direct (non-pooled) Postgres for migrations, which need session state. Defaults to POSTGRES_URL. */
+  POSTGRES_DIRECT_URL: z.string().optional(),
+  /** Use named prepared statements. Set false behind poolers without prepared-statement support. */
+  POSTGRES_PREPARE: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
   REDIS_URL: z.string().trim().optional(),
   /** Postgres statement_timeout for ordinary app transactions. 0 = disabled. */
   DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().nonnegative().default(0),

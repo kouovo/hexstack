@@ -755,7 +755,8 @@ pnpm db:migrate
 ```
 
 The [migrator](packages/persistence/src/migrate.ts) uses a session-level Postgres advisory lock so concurrent migrators
-serialize. The API **never migrates on boot**. Run migrations as a deploy step before rolling out code that needs them.
+serialize; it connects with `POSTGRES_DIRECT_URL` (falling back to `POSTGRES_URL`), which must bypass any
+transaction-mode pooler. The API **never migrates on boot**. Run migrations as a deploy step before rolling out code that needs them.
 `APP_MIGRATIONS_DIR` can override the CLI's migration root when packaging deployments.
 
 [0002_outbox_bullmq_relay.sql](apps/api/drizzle/postgres/0002_outbox_bullmq_relay.sql) replaces the earlier
@@ -765,6 +766,12 @@ so review dead rows before upgrading. Dropped correlation/causation/occurred-at 
 without overwriting existing values.
 
 Postgres is the runtime database. PGlite is a test adapter, not a second supported production database.
+
+**External connection pooler (optional).** No pooler is bundled. If you put `POSTGRES_URL` behind a transaction-mode
+pooler such as PgBouncer, set `POSTGRES_DIRECT_URL` to Postgres itself for migrations. Code that runs through the pooler must not rely on
+session state: use `SET LOCAL` / `set_config(..., true)` inside a transaction (as the statement timeout does), never
+session `SET`, session advisory locks, `LISTEN`, or temp tables across transactions. Named prepared statements work
+with PgBouncer ≥1.21 when `max_prepared_statements` > 0; behind a pooler that cannot track them, set `POSTGRES_PREPARE=false`.
 
 ### Redis caching
 
