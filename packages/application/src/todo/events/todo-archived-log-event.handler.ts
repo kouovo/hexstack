@@ -1,15 +1,15 @@
-import { eventHandler, type IEventHandler } from "@app/cqrs";
 import { singleton } from "@app/di";
-import { TodoArchivedEvent } from "@app/domain";
+import type { TodoArchivedEvent } from "@app/domain";
 import { createLogger } from "@app/logger";
 
-/** In-process, best-effort. TodoArchivedEvent has no durable consumer, so it is never written to the outbox. */
-@eventHandler(TodoArchivedEvent)
+import type { EventHandler, EventMeta } from "../../events/subscription";
+
+/** In-process, best-effort. TodoArchivedEvent has no durable subscription, so it is never written to the outbox. */
 @singleton()
-export class TodoArchivedLogEventHandler implements IEventHandler<TodoArchivedEvent> {
+export class TodoArchivedLogEventHandler implements EventHandler<TodoArchivedEvent> {
   private readonly logger = createLogger(TodoArchivedLogEventHandler.name);
 
-  handle(event: TodoArchivedEvent): void {
-    this.logger.info({ todoId: event.aggregateId, previousStatus: event.previousStatus, eventId: event.id }, "todo archived");
+  handle(event: TodoArchivedEvent, meta: EventMeta): void {
+    this.logger.info({ todoId: event.todoId, previousStatus: event.previousStatus, eventId: meta.id }, "todo archived");
   }
 }

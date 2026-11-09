@@ -22,6 +22,13 @@
       "when": 1792391366833,
       "tag": "0002_outbox_bullmq_relay",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794190267989,
+      "tag": "0003_millstream_outbox",
+      "breakpoints": true
     }
   ]
 }

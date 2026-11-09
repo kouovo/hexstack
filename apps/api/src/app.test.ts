@@ -4,7 +4,7 @@ import {
   type ISessionRepository,
   type ITodoRepository,
   type IUserRepository,
-  OUTBOX_REPO,
+  DOMAIN_EVENT_OUTBOX,
   PASSWORD_HASHER,
   RATE_LIMITER,
   type RateLimiter,
@@ -69,7 +69,7 @@ beforeAll(() => {
     },
   });
   container.register(RATE_LIMITER, { useValue: { consume } });
-  container.register(OUTBOX_REPO, { useValue: { insert: async () => {} } });
+  container.register(DOMAIN_EVENT_OUTBOX, { useValue: { publishMany: async () => [] } });
   container.register(APPLICATION_TRANSACTION_PORT, { useValue: { run: (work: () => Promise<unknown>) => work() } });
   container.register(CACHE, {
     useValue: {

@@ -1,11 +1,9 @@
-import { Command, commandHandler, type ICommandHandler, type IEventBus, injectEventBus } from "@app/cqrs";
+import { Command, commandHandler, type ICommandHandler } from "@app/cqrs";
 import { singleton } from "@app/di";
 import { TodoEntity, TodoTitle, TodoTitleSpecification, todoTitleSchema } from "@app/domain";
 import { z } from "@app/zod";
 
-import { type IOutboxService, injectOutboxService } from "../../outbox";
-import { runWithDomainEvents } from "../../shared/run-with-domain-events";
-import { type ApplicationTransactionPort, injectApplicationTransaction } from "../../transaction";
+import { type DomainEventScope, injectDomainEventScope } from "../../shared/domain-event-scope";
 import type { ITodoDTO } from "../todo.dto";
 import { TodoMapper } from "../todo.mapper";
 import { type ITodoRepository, injectTodoRepo } from "../todo.repository.port";
@@ -30,17 +28,15 @@ export class CreateTodoCommand extends Command implements ICreateTodoCommand {
 export class CreateTodoCommandHandler implements ICommandHandler<CreateTodoCommand, ITodoDTO> {
   constructor(
     @injectTodoRepo() private readonly todoRepo: ITodoRepository,
-    @injectApplicationTransaction() private readonly transaction: ApplicationTransactionPort,
-    @injectOutboxService() private readonly outboxService: IOutboxService,
-    @injectEventBus() private readonly eventBus: IEventBus,
+    @injectDomainEventScope() private readonly events: DomainEventScope,
   ) {}
 
   async execute(command: CreateTodoCommand): Promise<ITodoDTO> {
     const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create(command.title)));
 
-    await runWithDomainEvents(this.transaction, this.outboxService, this.eventBus, async () => {
+    await this.events.run(async (track) => {
       await this.todoRepo.insert(todo);
-      return todo.clearDomainEvents();
+      track(todo);
     });
 
     return TodoMapper.toResponse(todo);

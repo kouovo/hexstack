@@ -10,8 +10,13 @@ export function requirePostgresUrl(): string {
   return env.POSTGRES_URL;
 }
 
+/** Direct Postgres URL for session-dependent work (migrations); never routed through a transaction pooler. */
+export function requireDirectPostgresUrl(): string {
+  return env.POSTGRES_DIRECT_URL ?? requirePostgresUrl();
+}
+
 export function registerDBClient() {
   container.register(DB_CLIENT, {
-    useFactory: instanceCachingFactory(() => postgres(requirePostgresUrl())),
+    useFactory: instanceCachingFactory(() => postgres(requirePostgresUrl(), { prepare: env.POSTGRES_PREPARE })),
   });
 }

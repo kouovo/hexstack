@@ -1,4 +1,4 @@
-import { Command, commandHandler, type ICommandHandler, type IEventBus, injectEventBus } from "@app/cqrs";
+import { Command, commandHandler, type ICommandHandler } from "@app/cqrs";
 import { singleton } from "@app/di";
 import {
   Password,
@@ -13,9 +13,7 @@ import {
 } from "@app/domain";
 import { z } from "@app/zod";
 
-import { type IOutboxService, injectOutboxService } from "../../outbox";
-import { runWithDomainEvents } from "../../shared/run-with-domain-events";
-import { type ApplicationTransactionPort, injectApplicationTransaction } from "../../transaction";
+import { type DomainEventScope, injectDomainEventScope } from "../../shared/domain-event-scope";
 import { UserMapper } from "../../user/user.mapper";
 import { type IUserRepository, injectUserRepo } from "../../user/user.repository.port";
 import type { AuthResult } from "../auth.dto";
@@ -54,9 +52,7 @@ export class SignUpCommandHandler implements ICommandHandler<SignUpCommand, Auth
     @injectPasswordHasher() private readonly hasher: PasswordHasher,
     @injectRateLimiter() private readonly rateLimiter: RateLimiter,
     @injectSessionService() private readonly sessions: SessionService,
-    @injectApplicationTransaction() private readonly transaction: ApplicationTransactionPort,
-    @injectOutboxService() private readonly outboxService: IOutboxService,
-    @injectEventBus() private readonly eventBus: IEventBus,
+    @injectDomainEventScope() private readonly events: DomainEventScope,
   ) {}
 
   async execute(command: SignUpCommand): Promise<AuthResult> {
@@ -76,9 +72,10 @@ export class SignUpCommandHandler implements ICommandHandler<SignUpCommand, Auth
     const user = UserEntity.signUp(emailSpec.and(new UserPasswordHashSpecification(passwordHash)));
 
     // Account + first session commit together; a thrown duplicate rolls both back.
-    const { session, token } = await runWithDomainEvents(this.transaction, this.outboxService, this.eventBus, async () => {
+    const { session, token } = await this.events.run(async (track) => {
       await this.users.insert(user);
-      return { result: await this.sessions.start(user.id), events: user.clearDomainEvents() };
+      track(user);
+      return this.sessions.start(user.id);
     });
     return { user: UserMapper.toResponse(user), token, expiresAt: session.expiresAt };
   }

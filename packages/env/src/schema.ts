@@ -42,17 +42,23 @@ export const serverEnvSchema = {
     .enum(["true", "false"])
     .default("false")
     .transform((value) => value === "true"),
+  /** App connection string. May point at a transaction-mode pooler such as PgBouncer. */
   POSTGRES_URL: z.string().optional(),
+  /** Direct (non-pooled) Postgres for migrations, which need session state. Defaults to POSTGRES_URL. */
+  POSTGRES_DIRECT_URL: z.string().optional(),
+  /** Use named prepared statements. Set false behind poolers without prepared-statement support. */
+  POSTGRES_PREPARE: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
   REDIS_URL: z.string().trim().optional(),
   /** Postgres statement_timeout for ordinary app transactions. 0 = disabled. */
   DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().nonnegative().default(0),
   /** Postgres statement_timeout for heavy operations. 0 = disabled. */
   DB_HEAVY_STATEMENT_TIMEOUT_MS: z.coerce.number().int().nonnegative().default(120_000),
-  /** Repeat interval (ms) for publishing committed outbox rows to the BullMQ `domain-event` queue. */
-  OUTBOX_RELAY_TICK_INTERVAL_MS: z.coerce.number().int().positive().default(5_000),
-  /** Scan interval for deleting outbox rows published more than seven days ago. */
-  OUTBOX_CLEANUP_TICK_INTERVAL_MS: z.coerce.number().int().positive().default(3_600_000),
-  /** BullMQ execution policy for durable domain-event consumers, not relay publication. */
+  /** How often (ms) the relay polls the millstream outbox when it is empty. */
+  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1_000),
+  /** BullMQ execution policy (attempts, exponential backoff) for each durable consumer's queue. */
   DOMAIN_EVENT_JOB_ATTEMPTS: z.coerce.number().int().positive().default(10),
   DOMAIN_EVENT_JOB_BACKOFF_MS: z.coerce.number().int().positive().default(1_000),
 };

@@ -1,6 +1,7 @@
 export * from "./client";
 export * from "./db";
 export * from "./kysely";
+export * from "./millstream";
 export * from "./migrate";
 export * from "./persistence-date";
 export * from "./persistence-json";
@@ -9,7 +10,7 @@ export * from "./query-visitor";
 export * from "./register";
 export * from "./transaction";
 export * from "./transaction/application-transaction-adapter";
-export * from "./outbox/outbox.repository";
+export * from "./outbox/domain-event-outbox";
 export * from "./todo/todo.query-visitor";
 export * from "./todo/todo.repository";
 export * from "./user/user.query-visitor";

@@ -57,7 +57,7 @@ export class TodoEntity extends AggregateRoot<ITodoState> {
       updatedAt: at,
     } as ITodoState);
     const todo = new TodoEntity(state);
-    todo.addDomainEvent(new TodoCreatedEvent({ aggregateId: todo.id.value, title: todo.title.value }));
+    todo.addDomainEvent(TodoCreatedEvent, { todoId: todo.id.value, title: todo.title.value });
     return todo;
   }
 
@@ -69,14 +69,14 @@ export class TodoEntity extends AggregateRoot<ITodoState> {
   complete(at = new Date()): void {
     this.transitionTo("completed", at);
     this.state.completedAt = at;
-    this.addDomainEvent(new TodoCompletedEvent({ aggregateId: this.id.value, completedAt: at }));
+    this.addDomainEvent(TodoCompletedEvent, { todoId: this.id.value, completedAt: at });
   }
 
   /** open|completed -> archived. A rejected transition leaves state and events unchanged. */
   archive(at = new Date()): void {
     const previousStatus = this.state.status.value;
     this.transitionTo("archived", at);
-    this.addDomainEvent(new TodoArchivedEvent({ aggregateId: this.id.value, previousStatus, archivedAt: at }));
+    this.addDomainEvent(TodoArchivedEvent, { todoId: this.id.value, previousStatus, archivedAt: at });
   }
 
   private transitionTo(next: TodoStatusValue, at: Date): void {

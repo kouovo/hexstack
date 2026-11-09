@@ -50,7 +50,7 @@ export class UserEntity extends AggregateRoot<IUserState> {
       updatedAt: at,
     } as IUserState);
     const user = new UserEntity(state);
-    user.addDomainEvent(new UserSignedUpEvent({ aggregateId: user.id.value, email: user.email.value }));
+    user.addDomainEvent(UserSignedUpEvent, { userId: user.id.value, email: user.email.value });
     return user;
   }
 
@@ -70,7 +70,7 @@ export class UserEntity extends AggregateRoot<IUserState> {
     const previousRole = this.state.role.value;
     this.state.role = role;
     this.state.updatedAt = at;
-    this.addDomainEvent(new UserRoleChangedEvent({ aggregateId: this.id.value, previousRole, role: role.value }));
+    this.addDomainEvent(UserRoleChangedEvent, { userId: this.id.value, previousRole, role: role.value });
     return true;
   }
 }

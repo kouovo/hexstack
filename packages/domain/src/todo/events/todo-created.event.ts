@@ -1,11 +1,12 @@
-import { DomainEvent, type IDomainEventProps } from "@app/core";
+import { z } from "@app/zod";
+import { defineEvent, type EventPayload } from "@millstream/cqrs";
 
-export class TodoCreatedEvent extends DomainEvent {
-  static readonly type = "TodoCreatedEvent" as const;
-  readonly title: string;
-
-  constructor(props: IDomainEventProps<TodoCreatedEvent>) {
-    super(props);
-    this.title = props.title;
-  }
-}
+/** The name is the wire contract (topic, BullMQ queue, stored outbox rows): never change it, version it instead. */
+export const TodoCreatedEvent = defineEvent(
+  "todo.created.v1",
+  z.object({
+    todoId: z.string(),
+    title: z.string(),
+  }),
+);
+export type TodoCreatedEvent = EventPayload<typeof TodoCreatedEvent>;

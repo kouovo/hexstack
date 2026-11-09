@@ -7,16 +7,28 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@app/application": "workspace:*",
     "@app/core": "workspace:*",
     "@app/di": "workspace:*",
-    "@app/env": "workspace:*"
+    "@app/env": "workspace:*",
+    "@app/logger": "workspace:*",
+    "@app/persistence": "workspace:*",
+    "@app/redis": "workspace:*",
+    "@millstream/bullmq": "^0.3.0",
+    "@millstream/core": "^0.3.0",
+    "@millstream/cqrs": "^0.3.0",
+    "@millstream/forwarder": "^0.3.0",
+    "@millstream/pg": "^0.3.0",
+    "bullmq": "^5.81.5"
   },
   "devDependencies": {
     "@app/typescript-config": "workspace:*",
-    "@types/node": "^24.10.0"
+    "@app/zod": "workspace:*",
+    "@types/node": "^24.10.0",
+    "vitest": "^4.1.10"
   }
 }

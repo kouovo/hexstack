@@ -7,3 +7,9 @@ allowBuilds:
   esbuild: false
   msgpackr-extract: false
   simple-git-hooks: false
+minimumReleaseAgeExclude:
+  - '@millstream/cqrs@0.3.0'
+  - '@millstream/core@0.3.0'
+  - '@millstream/forwarder@0.3.0'
+  - '@millstream/pg@0.3.0'
+  - '@millstream/bullmq@0.3.0'

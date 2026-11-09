@@ -81,8 +81,8 @@ For a local smoke test against its Postgres/Redis, use a private, untracked env 
 
 ```env
 # /private/path/app-local.env — development values only
-POSTGRES_URL=postgres://app:app@host.docker.internal:6781/app
-REDIS_URL=redis://host.docker.internal:6780
+POSTGRES_URL=postgres://app:app@host.docker.internal:6889/app
+REDIS_URL=redis://host.docker.internal:6888
 CORS_ORIGINS=http://localhost:3000
 SESSION_COOKIE_SECURE=false
 ```
@@ -113,6 +113,8 @@ For a deployment, prefer a private Docker network and service DNS names over hos
   The UI and API must be same-site for `SameSite=Lax` cookies; see [security rules](../README.md#deployment-rules).
 - Provision Postgres/Redis and wait for them to be ready before migration/API startup. Images do not run migrations
   automatically, wait for dependencies, or provision TLS/proxies. Review the outbox migration's stop-old-process warning.
+- If you use a transaction-mode pooler, point `POSTGRES_URL` at it (PgBouncer ≥1.21 with `max_prepared_statements`, or set
+  `POSTGRES_PREPARE=false`) and `POSTGRES_DIRECT_URL` at Postgres itself for migrations.
 - Redis is not disposable cache when it carries BullMQ work: configure persistence, capacity, and `noeviction`.
 - Prefer MinIO/S3-compatible storage for multiple replicas. The API's local driver defaults to `/app/storage`;
   without a persistent mount it is ephemeral. A bind mount must be writable by the container's node user (uid 1000).

@@ -1,13 +1,12 @@
-import { DomainEvent, type IDomainEventProps } from "@app/core";
+import { z } from "@app/zod";
+import { defineEvent, type EventPayload } from "@millstream/cqrs";
 
-export class UserRoleChangedEvent extends DomainEvent {
-  static readonly type = "UserRoleChangedEvent" as const;
-  readonly previousRole: string;
-  readonly role: string;
-
-  constructor(props: IDomainEventProps<UserRoleChangedEvent>) {
-    super(props);
-    this.previousRole = props.previousRole;
-    this.role = props.role;
-  }
-}
+export const UserRoleChangedEvent = defineEvent(
+  "user.role-changed.v1",
+  z.object({
+    userId: z.string(),
+    previousRole: z.string(),
+    role: z.string(),
+  }),
+);
+export type UserRoleChangedEvent = EventPayload<typeof UserRoleChangedEvent>;

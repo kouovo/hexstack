@@ -11,6 +11,7 @@ import {
 } from "@app/domain";
 import { describe, expect, test, vi } from "vitest";
 
+import { DomainEventScope } from "../shared/domain-event-scope";
 import type { ApplicationTransactionPort } from "../transaction";
 import { AssignRoleCommand, AssignRoleCommandHandler } from "../user/commands/assign-role.command";
 import type { IUserRepository } from "../user/user.repository.port";
@@ -93,8 +94,9 @@ function setup() {
       }
     },
   };
-  const outbox = { append: vi.fn(async () => {}) };
-  const eventBus = { publishMany: vi.fn(async () => {}) } as never;
+  const outbox = { publishMany: vi.fn(async () => []) };
+  const eventBus = { publishMany: vi.fn(async () => []) };
+  const scope = new DomainEventScope(transaction, outbox, eventBus);
   return {
     users,
     order,
@@ -102,11 +104,11 @@ function setup() {
     sessionRows,
     sessions,
     limiter,
-    signUp: new SignUpCommandHandler(users, fakeHasher, limiter, sessions, transaction, outbox, eventBus),
+    signUp: new SignUpCommandHandler(users, fakeHasher, limiter, sessions, scope),
     signIn: new SignInCommandHandler(users, fakeHasher, limiter, sessions),
     signOut: new SignOutCommandHandler(sessions),
     signOutAll: new SignOutAllCommandHandler(sessions),
-    assignRole: new AssignRoleCommandHandler(users, transaction, outbox, eventBus),
+    assignRole: new AssignRoleCommandHandler(users, scope),
     me: new GetCurrentUserQueryHandler(users),
   };
 }
@@ -148,7 +150,7 @@ describe("sign-up / sign-in", () => {
   test("racing duplicate rolls back: no session, no event", async () => {
     const s = setup();
     await s.signUp.execute(new SignUpCommand(ada));
-    s.outbox.append.mockClear();
+    s.outbox.publishMany.mockClear();
     const sessionsBefore = s.sessionRows.rows.size;
     vi.spyOn(s.users, "findOne").mockResolvedValueOnce(undefined);
     await expect(s.signUp.execute(new SignUpCommand(ada))).rejects.toMatchObject({
@@ -157,7 +159,7 @@ describe("sign-up / sign-in", () => {
     });
     expect(s.order.at(-1)).toBe("rollback");
     expect(s.sessionRows.rows.size).toBe(sessionsBefore);
-    expect(s.outbox.append).not.toHaveBeenCalled();
+    expect(s.outbox.publishMany).not.toHaveBeenCalled();
   });
 
   test("sign-in issues a brand-new session each time", async () => {

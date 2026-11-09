@@ -1,8 +1,7 @@
-import type { IEventHandler } from "@app/cqrs";
 import { singleton } from "@app/di";
-import { TodoCompletedEvent } from "@app/domain";
+import type { TodoCompletedEvent } from "@app/domain";
 
-import { outboxHandler } from "../pubsub/outbox-handler.decorator";
+import type { EventHandler } from "../events/subscription";
 import { injectJobDispatcher, type JobDispatcher } from "../queue/queue.port";
 import {
   NOTIFY_TODO_COMPLETED_JOB_NAME,
@@ -11,18 +10,17 @@ import {
 } from "./jobs/notify-todo-completed.job";
 
 /**
- * Durable consumer: runs in the `domain-event` worker and hands off to a dedicated job.
- * The explicit consumer id keeps BullMQ job ids stable if this class is renamed.
+ * Durable subscription (see events/subscriptions.ts): runs from its own BullMQ queue and hands off to a dedicated job.
+ * Delivery is at-least-once; the deterministic job id makes a redelivery a no-op while the job is retained.
  */
-@outboxHandler(TodoCompletedEvent, "todo.dispatch-completion-notification")
 @singleton()
-export class DispatchTodoCompletedOutboxHandler implements IEventHandler<TodoCompletedEvent> {
+export class DispatchTodoCompletedOutboxHandler implements EventHandler<TodoCompletedEvent> {
   constructor(@injectJobDispatcher() private readonly dispatcher: JobDispatcher) {}
 
   async handle(event: TodoCompletedEvent): Promise<void> {
-    const payload = notifyTodoCompletedJobPayloadSchema.parse({ todoId: event.aggregateId });
+    const payload = notifyTodoCompletedJobPayloadSchema.parse({ todoId: event.todoId });
     await this.dispatcher.enqueue(NOTIFY_TODO_COMPLETED_JOB_NAME, payload, {
-      jobId: notifyTodoCompletedJobId(event.aggregateId),
+      jobId: notifyTodoCompletedJobId(event.todoId),
       attempts: 5,
       backoffDelay: 1_000,
     });

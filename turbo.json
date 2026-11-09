@@ -33,6 +33,8 @@
       "env": [
         "PORT",
         "POSTGRES_URL",
+        "POSTGRES_DIRECT_URL",
+        "POSTGRES_PREPARE",
         "REDIS_URL",
         "LOG_LEVEL",
         "CORS_ORIGINS",
@@ -50,8 +52,7 @@
         "STORAGE_MINIO_USE_SSL",
         "DB_STATEMENT_TIMEOUT_MS",
         "DB_HEAVY_STATEMENT_TIMEOUT_MS",
-        "OUTBOX_RELAY_TICK_INTERVAL_MS",
-        "OUTBOX_CLEANUP_TICK_INTERVAL_MS",
+        "OUTBOX_POLL_INTERVAL_MS",
         "DOMAIN_EVENT_JOB_ATTEMPTS",
         "DOMAIN_EVENT_JOB_BACKOFF_MS"
       ]

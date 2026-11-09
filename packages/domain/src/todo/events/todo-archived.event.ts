@@ -1,14 +1,13 @@
-import { DomainEvent, type IDomainEventProps } from "@app/core";
+import { z } from "@app/zod";
+import { defineEvent, type EventPayload } from "@millstream/cqrs";
 
-export class TodoArchivedEvent extends DomainEvent {
-  static readonly type = "TodoArchivedEvent" as const;
-  /** Status the todo was archived from ("open" or "completed"). */
-  readonly previousStatus: string;
-  readonly archivedAt: Date;
-
-  constructor(props: IDomainEventProps<TodoArchivedEvent>) {
-    super(props);
-    this.previousStatus = props.previousStatus;
-    this.archivedAt = props.archivedAt;
-  }
-}
+export const TodoArchivedEvent = defineEvent(
+  "todo.archived.v1",
+  z.object({
+    todoId: z.string(),
+    /** Status the todo was archived from ("open" or "completed"). */
+    previousStatus: z.string(),
+    archivedAt: z.coerce.date<Date>(),
+  }),
+);
+export type TodoArchivedEvent = EventPayload<typeof TodoArchivedEvent>;

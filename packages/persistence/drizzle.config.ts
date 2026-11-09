@@ -7,7 +7,7 @@ export default defineConfig({
   out: "../../apps/api/drizzle/postgres",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.POSTGRES_URL ?? "postgres://app:app@localhost:5432/app",
+    url: process.env.POSTGRES_DIRECT_URL ?? process.env.POSTGRES_URL ?? "postgres://app:app@localhost:5432/app",
   },
   tablesFilter: [TABLES_FILTER],
 });

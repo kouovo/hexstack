@@ -1,11 +1,17 @@
-import { OUTBOX_EVENT_WORKER, OUTBOX_RELAY } from "@app/application";
-import { container } from "@app/di";
+import { DOMAIN_EVENT_PIPELINE, DURABLE_EVENT_SUBSCRIPTIONS } from "@app/application";
+import { container, instanceCachingFactory } from "@app/di";
+import { type ISqlQueryBuilder, SQL_QUERY_BUILDER } from "@app/persistence";
 
-import { OutboxEventWorkerService } from "./outbox-event-worker.service";
-import { OutboxRelayService } from "./outbox-relay.service";
+import { MillstreamDomainEventPipeline } from "./domain-event-pipeline";
 
-/** Registers outbox transport; business modules supply the worker's handlers via registerApplicationOutboxHandlers(). */
+/** Durable event delivery (millstream outbox relay + BullMQ); the subscriptions are listed in @app/application. */
 export function registerPubSub() {
-  container.registerSingleton(OUTBOX_RELAY, OutboxRelayService);
-  container.registerSingleton(OUTBOX_EVENT_WORKER, OutboxEventWorkerService);
+  container.register(DOMAIN_EVENT_PIPELINE, {
+    useFactory: instanceCachingFactory(
+      (c) =>
+        new MillstreamDomainEventPipeline(c.resolve<ISqlQueryBuilder>(SQL_QUERY_BUILDER), DURABLE_EVENT_SUBSCRIPTIONS, (handler) =>
+          c.resolve(handler),
+        ),
+    ),
+  });
 }

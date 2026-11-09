@@ -1,9 +1,4 @@
-import {
-  registerApplicationJobs,
-  registerApplicationOutboxHandlers,
-  registerCacheInvalidation,
-  registerDomainCqrsHandlers,
-} from "@app/application";
+import { registerApplicationJobs, registerDomainCqrsHandlers } from "@app/application";
 import { registerAuth } from "@app/auth";
 import { registerCache } from "@app/cache";
 import { registerRequestContext } from "@app/context";
@@ -45,7 +40,5 @@ export function registerDI({ enableWorkers = true }: RegisterDIOptions = {}): vo
   registerQueue({ enableWorkers });
 
   registerDomainCqrsHandlers();
-  registerCacheInvalidation(); // global after-commit event handler; needs CACHE
-  registerApplicationOutboxHandlers();
   registerApplicationJobs();
 }

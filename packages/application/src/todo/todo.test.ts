@@ -10,6 +10,7 @@ import {
 import { describe, expect, test, vi } from "vitest";
 
 import { uncached } from "../cache/cache.test-helper";
+import { DomainEventScope } from "../shared/domain-event-scope";
 import type { ApplicationTransactionPort } from "../transaction";
 import { CompleteTodoCommand, CompleteTodoCommandHandler } from "./commands/complete-todo.command";
 import { CreateTodoCommand, CreateTodoCommandHandler } from "./commands/create-todo.command";
@@ -65,29 +66,34 @@ function setup() {
       }
     },
   };
-  const outbox = { append: vi.fn(async () => {}) };
-  const eventBus = { publishMany: vi.fn(async () => {}) };
+  const outbox = { publishMany: vi.fn(async () => []) };
+  const eventBus = { publishMany: vi.fn(async () => []) };
+  const scope = new DomainEventScope(transaction, outbox, eventBus);
   return {
     repo,
     order,
     eventBus,
     outbox,
-    create: new CreateTodoCommandHandler(repo, transaction, outbox, eventBus as never),
-    complete: new CompleteTodoCommandHandler(repo, transaction, outbox, eventBus as never),
+    create: new CreateTodoCommandHandler(repo, scope),
+    complete: new CompleteTodoCommandHandler(repo, scope),
     list: new ListTodosQueryHandler(repo, uncached()),
   };
 }
 
 describe("todo use cases", () => {
-  test("complete appends TodoCompletedEvent to the outbox inside the transaction", async () => {
+  test("complete publishes TodoCompletedEvent to the outbox inside the transaction", async () => {
     const s = setup();
     const created = await s.create.execute(new CreateTodoCommand({ title: "ship it" }));
-    s.outbox.append.mockClear();
+    s.outbox.publishMany.mockClear();
 
     const completed = await s.complete.execute(new CompleteTodoCommand({ todoId: created.id }));
 
     expect(completed.status).toBe("completed");
-    expect(s.outbox.append).toHaveBeenCalledExactlyOnceWith([expect.any(TodoCompletedEvent)]);
+    expect(s.outbox.publishMany).toHaveBeenCalledExactlyOnceWith([
+      expect.objectContaining({ event: TodoCompletedEvent, payload: expect.objectContaining({ todoId: created.id }) }),
+    ]);
+    // Everything is broadcast after commit, the durable event included.
+    expect(s.eventBus.publishMany).toHaveBeenLastCalledWith([expect.objectContaining({ event: TodoCompletedEvent })]);
   });
 
   test("unknown todo throws TodoNotFoundError and rolls back", async () => {
@@ -103,7 +109,7 @@ describe("todo use cases", () => {
     const s = setup();
     const created = await s.create.execute(new CreateTodoCommand({ title: "once" }));
     await s.complete.execute(new CompleteTodoCommand({ todoId: created.id }));
-    s.outbox.append.mockClear();
+    s.outbox.publishMany.mockClear();
     s.eventBus.publishMany.mockClear();
     const update = vi.spyOn(s.repo, "updateIfStatus");
 
@@ -113,7 +119,7 @@ describe("todo use cases", () => {
       to: "completed",
     });
     expect(update).not.toHaveBeenCalled();
-    expect(s.outbox.append).not.toHaveBeenCalled();
+    expect(s.outbox.publishMany).not.toHaveBeenCalled();
     expect(s.eventBus.publishMany).not.toHaveBeenCalled();
     expect(s.order.at(-1)).toBe("rollback");
   });
@@ -121,14 +127,14 @@ describe("todo use cases", () => {
   test("losing the conditional UPDATE race throws TodoModifiedConcurrentlyError; rollback, no outbox append", async () => {
     const s = setup();
     const created = await s.create.execute(new CreateTodoCommand({ title: "race" }));
-    s.outbox.append.mockClear();
+    s.outbox.publishMany.mockClear();
     vi.spyOn(s.repo, "updateIfStatus").mockResolvedValueOnce(false);
     await expect(s.complete.execute(new CompleteTodoCommand({ todoId: created.id }))).rejects.toMatchObject({
       _tag: "TodoModifiedConcurrentlyError",
       todoId: created.id,
       expectedStatus: "open",
     });
-    expect(s.outbox.append).not.toHaveBeenCalled();
+    expect(s.outbox.publishMany).not.toHaveBeenCalled();
     expect(s.order.at(-1)).toBe("rollback");
   });
 
@@ -157,8 +163,8 @@ describe("list query", () => {
 
 describe("todo async flow", () => {
   test("outbox handler enqueues with a deterministic jobId", async () => {
-    const dispatcher = { enqueue: vi.fn(async () => {}), registerJob: vi.fn(), scheduleRepeat: vi.fn() };
-    const event = new TodoCompletedEvent({ aggregateId: "todo_1", completedAt: new Date() });
+    const dispatcher = { enqueue: vi.fn(async () => {}), registerJob: vi.fn(), scheduleRepeat: vi.fn(), unscheduleRepeat: vi.fn() };
+    const event = { todoId: "todo_1", completedAt: new Date() };
     const handler = new DispatchTodoCompletedOutboxHandler(dispatcher);
     await handler.handle(event);
     await handler.handle(event);

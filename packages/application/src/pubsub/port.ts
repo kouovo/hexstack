@@ -1,32 +1,15 @@
-import { type DomainEvent } from "@app/core";
-import { type IEventHandler } from "@app/cqrs";
 import { inject } from "@app/di";
 
-export const OUTBOX_RELAY = Symbol.for("OUTBOX_RELAY");
-export const injectOutboxRelay = () => inject(OUTBOX_RELAY);
-
-export interface OutboxRelay {
-  /** Publishes a batch of committed, unpublished rows to BullMQ. Never runs business handlers. */
-  tick(): Promise<number>;
-  /** Deletes rows published longer ago than the retention period. */
-  cleanup(): Promise<number>;
+/**
+ * Durable event delivery for a long-running process: relays committed outbox entries to the broker and
+ * runs every durable subscription. Retries, backoff and failed-message retention belong to the broker.
+ */
+export interface DomainEventPipeline {
+  /** Starts consuming; resolves once every handler has subscribed. */
+  start(): Promise<void>;
+  /** Stops pulling, waits for in-flight messages, then releases connections. */
+  close(): Promise<void>;
 }
 
-export interface OutboxEventWorker {
-  registerJobs(): void;
-}
-
-export const OUTBOX_EVENT_WORKER = Symbol.for("OUTBOX_EVENT_WORKER");
-export const injectOutboxEventWorker = () => inject(OUTBOX_EVENT_WORKER);
-
-export type OutboxEventHandler = IEventHandler<DomainEvent, void>;
-
-export interface OutboxEventHandlerRegistration {
-  eventType: string;
-  /** Durable identity. Keep stable across deployments and handler renames. */
-  consumer: string;
-  handler: OutboxEventHandler;
-}
-
-export const OUTBOX_EVENT_HANDLERS = Symbol.for("OUTBOX_EVENT_HANDLERS");
-export const injectOutboxEventHandlers = () => inject(OUTBOX_EVENT_HANDLERS);
+export const DOMAIN_EVENT_PIPELINE = Symbol.for("DOMAIN_EVENT_PIPELINE");
+export const injectDomainEventPipeline = () => inject(DOMAIN_EVENT_PIPELINE);

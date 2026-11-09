@@ -1,12 +1,9 @@
-import type { DomainEvent } from "@app/core";
-import { Command, commandHandler, type ICommandHandler, type IEventBus, injectEventBus } from "@app/cqrs";
+import { Command, commandHandler, type ICommandHandler } from "@app/cqrs";
 import { singleton } from "@app/di";
-import { type TodoEntity, TodoId, TodoIdSpecification, todoIdSchema, TodoModifiedConcurrentlyError, TodoNotFoundError } from "@app/domain";
+import { TodoId, TodoIdSpecification, todoIdSchema, TodoModifiedConcurrentlyError, TodoNotFoundError } from "@app/domain";
 import { z } from "@app/zod";
 
-import { type IOutboxService, injectOutboxService } from "../../outbox";
-import { runWithDomainEvents } from "../../shared/run-with-domain-events";
-import { type ApplicationTransactionPort, injectApplicationTransaction } from "../../transaction";
+import { type DomainEventScope, injectDomainEventScope } from "../../shared/domain-event-scope";
 import type { ITodoDTO } from "../todo.dto";
 import { TodoMapper } from "../todo.mapper";
 import { type ITodoRepository, injectTodoRepo } from "../todo.repository.port";
@@ -32,32 +29,26 @@ export class CompleteTodoCommand extends Command implements ICompleteTodoCommand
 export class CompleteTodoCommandHandler implements ICommandHandler<CompleteTodoCommand, ITodoDTO> {
   constructor(
     @injectTodoRepo() private readonly todoRepo: ITodoRepository,
-    @injectApplicationTransaction() private readonly transaction: ApplicationTransactionPort,
-    @injectOutboxService() private readonly outboxService: IOutboxService,
-    @injectEventBus() private readonly eventBus: IEventBus,
+    @injectDomainEventScope() private readonly events: DomainEventScope,
   ) {}
 
   async execute(command: CompleteTodoCommand): Promise<ITodoDTO> {
     const id = TodoId.create(command.todoId); // already validated by the command schema
-    const changed = await runWithDomainEvents(
-      this.transaction,
-      this.outboxService,
-      this.eventBus,
-      async (): Promise<{ result: TodoEntity; events: DomainEvent[] }> => {
-        const todo = await this.todoRepo.findOne(new TodoIdSpecification(id));
-        if (!todo) throw new TodoNotFoundError({ todoId: id.value });
+    const changed = await this.events.run(async (track) => {
+      const todo = await this.todoRepo.findOne(new TodoIdSpecification(id));
+      if (!todo) throw new TodoNotFoundError({ todoId: id.value });
 
-        const expectedStatus = todo.status.value;
-        todo.complete();
+      const expectedStatus = todo.status.value;
+      todo.complete();
 
-        // Two concurrent requests may both pass the guard; only one conditional UPDATE wins,
-        // so the event reaches the outbox exactly once.
-        if (!(await this.todoRepo.updateIfStatus(todo, expectedStatus))) {
-          throw new TodoModifiedConcurrentlyError({ todoId: id.value, expectedStatus });
-        }
-        return { result: todo, events: todo.clearDomainEvents() };
-      },
-    );
+      // Two concurrent requests may both pass the guard; only one conditional UPDATE wins,
+      // so the event reaches the outbox exactly once.
+      if (!(await this.todoRepo.updateIfStatus(todo, expectedStatus))) {
+        throw new TodoModifiedConcurrentlyError({ todoId: id.value, expectedStatus });
+      }
+      track(todo);
+      return todo;
+    });
     return TodoMapper.toResponse(changed);
   }
 }
