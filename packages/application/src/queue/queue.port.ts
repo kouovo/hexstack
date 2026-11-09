@@ -21,6 +21,8 @@ export interface JobDispatcher {
   enqueue(name: string, payload: unknown, opts?: EnqueueOptions): Promise<void>;
   registerJob(name: string, handler: JobHandler, opts?: RegisterJobOptions): void;
   scheduleRepeat(name: string, intervalMs: number): Promise<void>;
+  /** Removes a schedule created by scheduleRepeat (e.g. a retired tick). No-op when absent. */
+  unscheduleRepeat(name: string): Promise<void>;
 }
 
 export const JOB_DISPATCHER = Symbol.for("JOB_DISPATCHER");

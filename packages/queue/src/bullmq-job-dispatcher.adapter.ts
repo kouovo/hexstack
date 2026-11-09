@@ -95,6 +95,10 @@ export class BullMQJobDispatcher implements JobDispatcher {
     this.logger.debug({ name, intervalMs }, "bullmq repeat job scheduled");
   }
 
+  async unscheduleRepeat(name: string): Promise<void> {
+    await this.getQueue(name).removeJobScheduler(name);
+  }
+
   private getQueue(name: string): Queue {
     let queue = this.queues.get(name);
     if (!queue) {

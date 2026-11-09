@@ -157,7 +157,7 @@ describe("list query", () => {
 
 describe("todo async flow", () => {
   test("outbox handler enqueues with a deterministic jobId", async () => {
-    const dispatcher = { enqueue: vi.fn(async () => {}), registerJob: vi.fn(), scheduleRepeat: vi.fn() };
+    const dispatcher = { enqueue: vi.fn(async () => {}), registerJob: vi.fn(), scheduleRepeat: vi.fn(), unscheduleRepeat: vi.fn() };
     const event = new TodoCompletedEvent({ aggregateId: "todo_1", completedAt: new Date() });
     const handler = new DispatchTodoCompletedOutboxHandler(dispatcher);
     await handler.handle(event);
