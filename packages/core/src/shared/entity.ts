@@ -1,4 +1,6 @@
-import type { DomainEvent } from "./events";
+import type { AnyEventDefinition, EventInput, EventItem } from "@millstream/cqrs";
+
+import { generateId } from "./id";
 import type { IdentifierValue } from "./identifiers";
 
 export interface IEntityState<Id extends IdentifierValue = IdentifierValue> {
@@ -17,19 +19,20 @@ export abstract class AggregateRoot<
   TEntityState extends IEntityState<TId>,
   TId extends IdentifierValue = TEntityState["id"],
 > extends Entity<TEntityState, TId> {
-  private readonly domainEvents: DomainEvent[] = [];
+  private readonly domainEvents: EventItem[] = [];
 
-  protected addDomainEvent(domainEvent: DomainEvent): void {
-    this.domainEvents.push(domainEvent);
+  /**
+   * Records a domain event (a millstream `defineEvent` definition plus its payload). The event id is fixed here,
+   * so every transport (outbox, in-process bus) carries the same message uuid.
+   */
+  protected addDomainEvent<E extends AnyEventDefinition>(event: E, payload: EventInput<E>): void {
+    this.domainEvents.push(event.of(payload, { uuid: generateId("event") }));
   }
 
-  clearDomainEvents(): DomainEvent[] {
+  /** Hands the recorded events out once (DomainEventScope collects them after the use case's work). */
+  clearDomainEvents(): EventItem[] {
     const events = [...this.domainEvents];
     this.domainEvents.length = 0;
     return events;
-  }
-
-  get events() {
-    return this.domainEvents;
   }
 }

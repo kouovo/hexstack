@@ -1,11 +1,11 @@
-import { DomainEvent, type IDomainEventProps } from "@app/core";
+import { z } from "@app/zod";
+import { defineEvent, type EventPayload } from "@millstream/cqrs";
 
-export class UserSignedUpEvent extends DomainEvent {
-  static readonly type = "UserSignedUpEvent" as const;
-  readonly email: string;
-
-  constructor(props: IDomainEventProps<UserSignedUpEvent>) {
-    super(props);
-    this.email = props.email;
-  }
-}
+export const UserSignedUpEvent = defineEvent(
+  "user.signed-up.v1",
+  z.object({
+    userId: z.string(),
+    email: z.string(),
+  }),
+);
+export type UserSignedUpEvent = EventPayload<typeof UserSignedUpEvent>;

@@ -242,6 +242,12 @@ importers:
       '@app/zod':
         specifier: workspace:*
         version: link:../zod
+      '@millstream/core':
+        specifier: ^0.3.0
+        version: 0.3.0
+      '@millstream/cqrs':
+        specifier: ^0.3.0
+        version: 0.3.0
     devDependencies:
       '@app/typescript-config':
         specifier: workspace:*
@@ -376,6 +382,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@millstream/cqrs':
+        specifier: ^0.3.0
+        version: 0.3.0
       nanoid:
         specifier: ^5.1.11
         version: 5.1.16
@@ -442,6 +451,9 @@ importers:
       '@app/zod':
         specifier: workspace:*
         version: link:../zod
+      '@millstream/cqrs':
+        specifier: ^0.3.0
+        version: 0.3.0
     devDependencies:
       '@app/typescript-config':
         specifier: workspace:*
@@ -505,6 +517,18 @@ importers:
       '@app/logger':
         specifier: workspace:*
         version: link:../logger
+      '@millstream/core':
+        specifier: ^0.3.0
+        version: 0.3.0
+      '@millstream/cqrs':
+        specifier: ^0.3.0
+        version: 0.3.0
+      '@millstream/forwarder':
+        specifier: ^0.3.0
+        version: 0.3.0
+      '@millstream/pg':
+        specifier: ^0.3.0
+        version: 0.3.0(kysely@0.28.18)(postgres@3.4.9)
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.4(@electric-sql/pglite@0.4.6)(kysely@0.28.18)(postgres@3.4.9)
@@ -548,13 +572,46 @@ importers:
       '@app/env':
         specifier: workspace:*
         version: link:../env
+      '@app/logger':
+        specifier: workspace:*
+        version: link:../logger
+      '@app/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@app/redis':
+        specifier: workspace:*
+        version: link:../redis
+      '@millstream/bullmq':
+        specifier: ^0.3.0
+        version: 0.3.0(bullmq@5.81.5)
+      '@millstream/core':
+        specifier: ^0.3.0
+        version: 0.3.0
+      '@millstream/cqrs':
+        specifier: ^0.3.0
+        version: 0.3.0
+      '@millstream/forwarder':
+        specifier: ^0.3.0
+        version: 0.3.0
+      '@millstream/pg':
+        specifier: ^0.3.0
+        version: 0.3.0(kysely@0.28.18)(postgres@3.4.9)
+      bullmq:
+        specifier: ^5.81.5
+        version: 5.81.5
     devDependencies:
       '@app/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@app/zod':
+        specifier: workspace:*
+        version: link:../zod
       '@types/node':
         specifier: ^24.10.0
         version: 24.19.2
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.12(@types/node@24.19.2)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/queue:
     dependencies:
@@ -1348,6 +1405,39 @@ packages:
 
   '@keyv/serialize@1.1.1':
     resolution: {integrity: sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA==}
+
+  '@millstream/bullmq@0.3.0':
+    resolution: {integrity: sha512-JCaogl23XSW9iyXB7xCoKPCW9oOXUiKxqBLg4i9UDbuiIoZ5d53psbpsIBnahMs2YQBi0l7PkEKNLiHTqTODbw==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      bullmq: ^5.0.0
+
+  '@millstream/core@0.3.0':
+    resolution: {integrity: sha512-4K81bXgibIOTh7/LuIv3d8x6NDVjZnfRfBHhPI8/xEv66JtCzqwTyMq85KQSdp3ONJoGdI4ZI+xg/2x4Ed2fEQ==}
+    engines: {node: '>=22'}
+
+  '@millstream/cqrs@0.3.0':
+    resolution: {integrity: sha512-V2H+iUT6kCkZhOK9JGpquxdma6GNQ0eYi3wvtNPq6D2EFuf2U6kCGNeByl7yw5qpLl19pERx9Lcxr44V0u+quw==}
+    engines: {node: '>=22'}
+
+  '@millstream/forwarder@0.3.0':
+    resolution: {integrity: sha512-X2IiaGOLATgJgPt3XDokVnc90l9aL30yqwJC8T34UzTB5WH9WPnWy9DbIs/5s4Z8qDDmesrP7Y8k4hZSgNUCoA==}
+    engines: {node: '>=22'}
+
+  '@millstream/pg@0.3.0':
+    resolution: {integrity: sha512-MDE0ST0yfPUmrTCK3OrS+KCICDrbPCRhfTLrs+LhaMgLj89oR0v+/E9DlXMnCd+PtyNa52UVsWskLC1viEQ+hg==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      kysely: '>=0.27.0'
+      pg: ^8.11.0
+      postgres: '>=3.4.0'
+    peerDependenciesMeta:
+      kysely:
+        optional: true
+      pg:
+        optional: true
+      postgres:
+        optional: true
 
   '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4':
     resolution: {integrity: sha512-LCkGo6JDfaBhgST7UpPWgNgLINpcpabaHfyz5OBx75nUYxBsaEPxjnyNjWpeb/xBup/682QnBfRBy2/LvPutZQ==}
@@ -3885,6 +3975,28 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.6.0
 
   '@keyv/serialize@1.1.1': {}
+
+  '@millstream/bullmq@0.3.0(bullmq@5.81.5)':
+    dependencies:
+      '@millstream/core': 0.3.0
+      bullmq: 5.81.5
+
+  '@millstream/core@0.3.0': {}
+
+  '@millstream/cqrs@0.3.0':
+    dependencies:
+      '@millstream/core': 0.3.0
+
+  '@millstream/forwarder@0.3.0':
+    dependencies:
+      '@millstream/core': 0.3.0
+
+  '@millstream/pg@0.3.0(kysely@0.28.18)(postgres@3.4.9)':
+    dependencies:
+      '@millstream/core': 0.3.0
+    optionalDependencies:
+      kysely: 0.28.18
+      postgres: 3.4.9
 
   '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4':
     optional: true

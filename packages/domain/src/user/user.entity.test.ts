@@ -20,7 +20,9 @@ describe(UserEntity.name, () => {
     const user = newUser();
     expect(user.email.value).toBe("ada@example.com");
     expect(user.role.value).toBe("member");
-    expect(user.clearDomainEvents()).toEqual([expect.any(UserSignedUpEvent)]);
+    expect(user.clearDomainEvents()).toEqual([
+      expect.objectContaining({ event: UserSignedUpEvent, payload: { userId: user.id.value, email: "ada@example.com" } }),
+    ]);
   });
 
   test("changeRole records an event only when the role actually changes", () => {
@@ -29,8 +31,7 @@ describe(UserEntity.name, () => {
     expect(user.changeRole(UserRole.create("member"))).toBe(false);
     expect(user.changeRole(UserRole.create("admin"))).toBe(true);
     const [event] = user.clearDomainEvents();
-    expect(event).toBeInstanceOf(UserRoleChangedEvent);
-    expect(event).toMatchObject({ previousRole: "member", role: "admin" });
+    expect(event).toMatchObject({ event: UserRoleChangedEvent, payload: { userId: user.id.value, previousRole: "member", role: "admin" } });
   });
 
   test("the entity never serialises its password hash", () => {

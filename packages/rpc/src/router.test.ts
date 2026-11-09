@@ -3,7 +3,7 @@ import {
   CACHE,
   type ITodoRepository,
   type IUserRepository,
-  OUTBOX_REPO,
+  DOMAIN_EVENT_OUTBOX,
   PASSWORD_HASHER,
   RATE_LIMITER,
   registerDomainCqrsHandlers,
@@ -60,7 +60,7 @@ function seedUser(role: string): RequestPrincipal {
 beforeAll(() => {
   container.register(TODO_REPO, { useValue: todoRepo });
   container.register(USER_REPO, { useValue: userRepo });
-  container.register(OUTBOX_REPO, { useValue: { insert: vi.fn() } });
+  container.register(DOMAIN_EVENT_OUTBOX, { useValue: { publishMany: vi.fn(async () => []) } });
   // Sign-up/sign-in over HTTP (cookies, CSRF) are covered in apps/api/src/app.test.ts.
   container.register(PASSWORD_HASHER, { useValue: {} });
   container.register(RATE_LIMITER, { useValue: {} });

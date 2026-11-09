@@ -6,13 +6,13 @@ import {
   CreateTodoCommand,
   CreateTodoCommandHandler,
   NotifyTodoCompletedJobHandler,
-  type OutboxMessage,
-  OutboxService,
-  runWithDomainEvents,
+  DomainEventScope,
+  type DomainEventPublisher,
   TodoMapper,
 } from "@app/application";
 import { DomainError } from "@app/core";
 import {
+  TodoCompletedEvent,
   TodoEntity,
   TodoId,
   TodoIdSpecification,
@@ -21,45 +21,62 @@ import {
   TodoTitle,
   TodoTitleSpecification,
 } from "@app/domain";
+import { Message } from "@millstream/core";
+import { unwrapEnvelope } from "@millstream/forwarder";
 import { afterAll, beforeAll, beforeEach, expect, test } from "vitest";
 
-import { OUTBOX_TABLE, TODO_TABLE } from "../db";
-import { OutboxRepository } from "../outbox/outbox.repository";
+import { TODO_TABLE } from "../db";
+import { OUTBOX_TOPIC } from "../millstream";
+import { createOutboxEventBus } from "../outbox/domain-event-outbox";
 import { createTestDatabase, type TestDatabase } from "../testing/test-database";
 import { ApplicationTransactionAdapter } from "../transaction/application-transaction-adapter";
 import { TodoRepository } from "./todo.repository";
 
 let db: TestDatabase;
 let repo: TodoRepository;
-let outboxRepo: OutboxRepository;
+let outbox: DomainEventPublisher;
 
 beforeAll(async () => {
   db = await createTestDatabase();
   repo = new TodoRepository(db.transactions);
-  outboxRepo = new OutboxRepository(db.transactions);
+  outbox = createOutboxEventBus(db.transactions);
 }, 30_000);
 beforeEach(async () => {
-  await db.pglite.exec(`DELETE FROM ${TODO_TABLE}; DELETE FROM ${OUTBOX_TABLE};`);
+  await db.pglite.exec(`DELETE FROM ${TODO_TABLE}; DELETE FROM ${OUTBOX_QUEUE_TABLE};`);
 });
 afterAll(async () => {
   await db?.close();
 });
 
-async function pending(): Promise<OutboxMessage[]> {
-  const entries: OutboxMessage[] = [];
-  await outboxRepo.publishPending(10, async (entry) => void entries.push(entry));
-  return entries;
+const OUTBOX_QUEUE_TABLE = `millstream_queue_${OUTBOX_TOPIC}`;
+
+type PendingEntry = { id: string; eventName: string; event: Record<string, unknown> };
+
+/** Unrelayed outbox entries, decoded the way the relay does. */
+async function pending(): Promise<PendingEntry[]> {
+  const { rows } = await db.pglite.query<{ uuid: string; payload: Uint8Array; metadata: Record<string, string> }>(
+    `SELECT uuid, payload, metadata FROM ${OUTBOX_QUEUE_TABLE} ORDER BY id`,
+  );
+  return rows.map((row) => {
+    const { destinationTopic, message } = unwrapEnvelope(new Message(row.uuid, Buffer.from(row.payload), row.metadata));
+    return {
+      id: message.uuid,
+      eventName: destinationTopic,
+      event: JSON.parse(message.payload.toString("utf8")) as Record<string, unknown>,
+    };
+  });
 }
 
-const noEventBus = { publishMany: async () => {} } as never;
+const noEventBus = { publishMany: async () => [] };
+
+const scope = (target: DomainEventPublisher = outbox) =>
+  new DomainEventScope(new ApplicationTransactionAdapter(db.transactions), target, noEventBus);
 
 function handlers() {
-  const transaction = new ApplicationTransactionAdapter(db.transactions);
-  const outbox = new OutboxService(outboxRepo);
   return {
-    create: new CreateTodoCommandHandler(repo, transaction, outbox, noEventBus),
-    complete: new CompleteTodoCommandHandler(repo, transaction, outbox, noEventBus),
-    archive: new ArchiveTodoCommandHandler(repo, transaction, outbox, noEventBus),
+    create: new CreateTodoCommandHandler(repo, scope()),
+    complete: new CompleteTodoCommandHandler(repo, scope()),
+    archive: new ArchiveTodoCommandHandler(repo, scope()),
   };
 }
 
@@ -129,7 +146,8 @@ test("complete commits the todo row and its outbox row together", async () => {
 
   await complete.execute(new CompleteTodoCommand({ todoId: created.id }));
   const [entry] = await pending();
-  expect(entry).toMatchObject({ aggregateType: "todo", aggregateId: created.id, eventType: "TodoCompletedEvent" });
+  expect(entry).toMatchObject({ id: expect.stringMatching(/^event/), eventName: TodoCompletedEvent.name });
+  expect(entry!.event).toEqual({ todoId: created.id, completedAt: expect.any(String) });
 });
 
 test("archive persists the status but writes no outbox row (no durable consumer)", async () => {
@@ -137,22 +155,17 @@ test("archive persists the status but writes no outbox row (no durable consumer)
   const created = await create.execute(new CreateTodoCommand({ title: "archive me" }));
   await archive.execute(new ArchiveTodoCommand({ todoId: created.id }));
   expect((await repo.findOne(new TodoIdSpecification(TodoId.create(created.id))))?.status.value).toBe("archived");
-  const { count } = await db.queryBuilder
-    .selectFrom(OUTBOX_TABLE)
-    .select((eb) => eb.fn.countAll<number>().as("count"))
-    .executeTakeFirstOrThrow();
-  expect(Number(count)).toBe(0);
+  expect(await pending()).toEqual([]);
 });
 
 test("a failing outbox insert rolls back the status change", async () => {
-  const transaction = new ApplicationTransactionAdapter(db.transactions);
-  const brokenOutbox = new OutboxService({
-    insert: async () => {
+  const brokenOutbox = {
+    publishMany: async () => {
       throw new Error("outbox down");
     },
-  } as never);
+  };
   const created = await handlers().create.execute(new CreateTodoCommand({ title: "atomic" }));
-  const complete = new CompleteTodoCommandHandler(repo, transaction, brokenOutbox, noEventBus);
+  const complete = new CompleteTodoCommandHandler(repo, scope(brokenOutbox));
 
   await expect(complete.execute(new CompleteTodoCommand({ todoId: created.id }))).rejects.toThrow("outbox down");
   expect((await repo.findOne(new TodoIdSpecification(TodoId.create(created.id))))?.status.value).toBe("open");
@@ -186,16 +199,15 @@ class ExpectedFailure extends DomainError<"ExpectedFailure"> {
 }
 
 test("a thrown domain error after a write rolls the real transaction back: no todo row, no outbox row", async () => {
-  const transaction = new ApplicationTransactionAdapter(db.transactions);
-  const outbox = new OutboxService(outboxRepo);
   const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create("never committed")));
   todo.clearDomainEvents();
   todo.complete();
 
   const failure = new ExpectedFailure("rule broken after the write");
   await expect(
-    runWithDomainEvents(transaction, outbox, noEventBus, async () => {
+    scope().run(async (track) => {
       await repo.insert(todo);
+      track(todo);
       throw failure;
     }),
   ).rejects.toBe(failure);
@@ -208,7 +220,7 @@ test("completing a completed todo through the real handler throws and leaves the
   const created = await create.execute(new CreateTodoCommand({ title: "complete twice" }));
   await complete.execute(new CompleteTodoCommand({ todoId: created.id }));
   const before = await repo.findOne(new TodoIdSpecification(TodoId.create(created.id)));
-  await outboxRepo.publishPending(10, async () => {}); // drain the first completion
+  await db.pglite.exec(`DELETE FROM ${OUTBOX_QUEUE_TABLE};`); // relay the first completion
 
   await expect(complete.execute(new CompleteTodoCommand({ todoId: created.id }))).rejects.toMatchObject({
     _tag: "TodoTransitionNotAllowedError",

@@ -12,7 +12,9 @@ describe(TodoEntity.name, () => {
   test("create starts open and records TodoCreatedEvent", () => {
     const todo = newTodo();
     expect(todo.status.value).toBe("open");
-    expect(todo.clearDomainEvents()).toEqual([expect.any(TodoCreatedEvent)]);
+    expect(todo.clearDomainEvents()).toEqual([
+      expect.objectContaining({ event: TodoCreatedEvent, payload: { todoId: todo.id.value, title: todo.title.value } }),
+    ]);
   });
 
   test("complete moves open -> completed and records TodoCompletedEvent", () => {
@@ -23,8 +25,8 @@ describe(TodoEntity.name, () => {
     expect(todo.status.value).toBe("completed");
     expect(todo.completedAt).toEqual(at);
     const [event] = todo.clearDomainEvents();
-    expect(event).toBeInstanceOf(TodoCompletedEvent);
-    expect(event).toMatchObject({ aggregateId: todo.id.value, completedAt: at });
+    expect(event).toMatchObject({ event: TodoCompletedEvent, payload: { todoId: todo.id.value, completedAt: at } });
+    expect(event!.uuid).toMatch(/^event/); // fixed at record time: every transport carries the same id
   });
 
   test("completing twice throws with context; the entity is unchanged and records no event", () => {
@@ -51,8 +53,7 @@ describe(TodoEntity.name, () => {
     expect(todo.archive()).toBeUndefined();
     expect(todo.status.value).toBe("archived");
     const [event] = todo.clearDomainEvents();
-    expect(event).toBeInstanceOf(TodoArchivedEvent);
-    expect(event).toMatchObject({ aggregateId: todo.id.value, previousStatus: "completed" });
+    expect(event).toMatchObject({ event: TodoArchivedEvent, payload: { todoId: todo.id.value, previousStatus: "completed" } });
     expect(() => todo.archive()).toThrow(expect.objectContaining({ from: "archived", to: "archived" }));
     expect(todo.clearDomainEvents()).toEqual([]);
   });

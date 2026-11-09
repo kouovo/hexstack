@@ -1,4 +1,4 @@
-import { SessionService, SignUpCommand, SignUpCommandHandler, UserMapper } from "@app/application";
+import { DomainEventScope, SessionService, SignUpCommand, SignUpCommandHandler, UserMapper } from "@app/application";
 import {
   PasswordHash,
   UserEmail,
@@ -76,9 +76,11 @@ test("a racing duplicate inside the sign-up transaction rolls back the account a
     { hash: async () => PasswordHash.rehydrate("$stub"), verify: async () => false },
     { consume: async () => true },
     sessions,
-    new ApplicationTransactionAdapter(db.transactions),
-    { append: async () => {} },
-    { publish: async () => {}, publishMany: async () => {} },
+    new DomainEventScope(
+      new ApplicationTransactionAdapter(db.transactions),
+      { publishMany: async () => [] },
+      { publishMany: async () => [] },
+    ),
   );
   const existing = newUser();
   await users.insert(existing);
@@ -155,9 +157,11 @@ test("sign-up rolls back the account when creating its session fails", async () 
     { hash: async () => PasswordHash.rehydrate("$stub"), verify: async () => false },
     { consume: async () => true },
     failedSessions,
-    new ApplicationTransactionAdapter(db.transactions),
-    { append: async () => {} },
-    { publish: async () => {}, publishMany: async () => {} },
+    new DomainEventScope(
+      new ApplicationTransactionAdapter(db.transactions),
+      { publishMany: async () => [] },
+      { publishMany: async () => [] },
+    ),
   );
   await expect(
     handler.execute(new SignUpCommand({ email: "ada@example.com", password: "correct horse", clientKey: "test" })),

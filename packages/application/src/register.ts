@@ -1,23 +1,25 @@
-import { CommandBus, EventBus, QueryBus } from "@app/cqrs";
-import { container } from "@app/di";
+import { CommandBus, QueryBus } from "@app/cqrs";
+import { container, instanceCachingFactory } from "@app/di";
 
 import { SignInCommandHandler, SignOutAllCommandHandler, SignOutCommandHandler, SignUpCommandHandler } from "./auth/commands";
 import { GetCurrentUserQueryHandler } from "./auth/queries";
-import { CacheInvalidationEventsHandler } from "./cache/events";
+import { InProcessEventBus } from "./events/in-process-event-bus";
+import { DOMAIN_EVENT_BUS } from "./events/port";
+import { IN_PROCESS_EVENT_SUBSCRIPTIONS } from "./events/subscriptions";
 import { ArchiveTodoCommandHandler, CompleteTodoCommandHandler, CreateTodoCommandHandler } from "./todo/commands";
-import { TodoArchivedLogEventHandler, TodoCompletedLogEventHandler, TodoCreatedLogEventHandler } from "./todo/events";
 import { ListTodosQueryHandler } from "./todo/queries";
-import { registerTodoCacheInvalidation } from "./todo/todo-cache-invalidation";
 import { AssignRoleCommandHandler } from "./user/commands";
-import { UserRoleChangedLogEventHandler } from "./user/events";
 import { ListUsersQueryHandler } from "./user/queries";
 
 /**
- * Command/query handlers and in-process event handlers for every bounded context.
- * Ports they inject must be registered first. Durable (outbox) consumers are registered separately
- * in register-application-outbox-handlers.ts.
+ * Command/query handlers for every bounded context, plus the in-process event bus they publish to.
+ * Ports they inject must be registered first. Event handlers are listed in events/subscriptions.ts; the durable
+ * ones are run by the pipeline in @app/pubsub.
  */
 export function registerDomainCqrsHandlers(): void {
+  container.register(DOMAIN_EVENT_BUS, {
+    useFactory: instanceCachingFactory((c) => new InProcessEventBus(IN_PROCESS_EVENT_SUBSCRIPTIONS, (handler) => c.resolve(handler))),
+  });
   container
     .resolve(CommandBus)
     .register([
@@ -31,18 +33,4 @@ export function registerDomainCqrsHandlers(): void {
       AssignRoleCommandHandler,
     ]);
   container.resolve(QueryBus).register([ListTodosQueryHandler, ListUsersQueryHandler, GetCurrentUserQueryHandler]);
-  container
-    .resolve(EventBus)
-    .register([TodoCreatedLogEventHandler, TodoCompletedLogEventHandler, TodoArchivedLogEventHandler, UserRoleChangedLogEventHandler]);
-}
-
-/**
- * One global after-commit handler maps domain events to cache invalidations; each bounded context
- * contributes its rules here. Needs the CACHE port (registerCache()).
- */
-export function registerCacheInvalidation(): void {
-  const eventBus = container.resolve(EventBus);
-  const cacheInvalidationHandler = container.resolve(CacheInvalidationEventsHandler);
-  eventBus.registerGlobal(cacheInvalidationHandler);
-  registerTodoCacheInvalidation(cacheInvalidationHandler);
 }

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { bigserial, check, index, jsonb, pgTableCreator, text, timestamp as pgTimestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { check, index, pgTableCreator, text, timestamp as pgTimestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { tableName } from "./table-prefix";
 
@@ -7,30 +7,6 @@ const pgTable = pgTableCreator(tableName);
 
 // Persist event times as PostgreSQL timestamptz while keeping JavaScript Date values.
 const timestamp = <TName extends string>(name: TName) => pgTimestamp(name, { withTimezone: true, mode: "date" });
-
-/**
- * Transactional outbox: written in the producer's transaction, published to BullMQ by OutboxRelayService.
- * `published_at` means "handed to BullMQ", not "processed"; execution state lives in the `domain-event` queue.
- */
-export const outbox = pgTable(
-  "outbox",
-  {
-    id: text("id").primaryKey(),
-    seq: bigserial("seq", { mode: "number" }).notNull(),
-    aggregateType: text("aggregate_type").notNull(),
-    aggregateId: text("aggregate_id").notNull(),
-    eventType: text("event_type").notNull(),
-    payload: jsonb("payload").notNull(),
-    correlationId: text("correlation_id"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    publishedAt: timestamp("published_at"),
-  },
-  (table) => [
-    index("outbox_unpublished_idx")
-      .on(table.seq)
-      .where(sql`published_at is null`),
-  ],
-);
 
 /** Example bounded context. Copy this table when adding a new one. */
 export const todo = pgTable(

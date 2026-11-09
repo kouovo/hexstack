@@ -1,8 +1,10 @@
-import { EventBus } from "@app/cqrs";
 import { container } from "@app/di";
 import { TodoArchivedEvent, TodoCompletedEvent, TodoCreatedEvent, type TodoEntity, type TodoSpecification } from "@app/domain";
 import { describe, expect, test, vi } from "vitest";
 
+import { InProcessEventBus } from "../../events/in-process-event-bus";
+import { IN_PROCESS_EVENT_SUBSCRIPTIONS } from "../../events/subscriptions";
+import { DomainEventScope } from "../../shared/domain-event-scope";
 import type { ApplicationTransactionPort } from "../../transaction";
 import { ArchiveTodoCommand, ArchiveTodoCommandHandler } from "../commands/archive-todo.command";
 import { CompleteTodoCommand, CompleteTodoCommandHandler } from "../commands/complete-todo.command";
@@ -28,40 +30,46 @@ function setup() {
       return result;
     },
   };
-  const outbox = { append: vi.fn(async () => {}) };
+  const outbox = { publishMany: vi.fn(async () => []) };
 
-  const eventBus = new EventBus();
   const created = container.resolve(TodoCreatedLogEventHandler);
   const completed = container.resolve(TodoCompletedLogEventHandler);
   const archived = container.resolve(TodoArchivedLogEventHandler);
   const spies = {
-    created: vi.spyOn(created, "handle").mockImplementation(() => void order.push("TodoCreatedEvent")),
-    completed: vi.spyOn(completed, "handle").mockImplementation(() => void order.push("TodoCompletedEvent")),
-    archived: vi.spyOn(archived, "handle").mockImplementation(() => void order.push("TodoArchivedEvent")),
+    created: vi.spyOn(created, "handle").mockImplementation(() => void order.push(TodoCreatedEvent.name)),
+    completed: vi.spyOn(completed, "handle").mockImplementation(() => void order.push(TodoCompletedEvent.name)),
+    archived: vi.spyOn(archived, "handle").mockImplementation(() => void order.push(TodoArchivedEvent.name)),
   };
-  eventBus.register([TodoCreatedLogEventHandler, TodoCompletedLogEventHandler, TodoArchivedLogEventHandler]);
+  // The real millstream in-process bus, with the app's logging subscriptions.
+  const logging = IN_PROCESS_EVENT_SUBSCRIPTIONS.filter(({ name }) => name.endsWith(".log"));
+  const bus = new InProcessEventBus(logging, (handler) => container.resolve(handler));
+  const scope = new DomainEventScope(transaction, outbox, bus);
 
   return {
     order,
     spies,
-    create: new CreateTodoCommandHandler(repo, transaction, outbox, eventBus),
-    complete: new CompleteTodoCommandHandler(repo, transaction, outbox, eventBus),
-    archive: new ArchiveTodoCommandHandler(repo, transaction, outbox, eventBus),
+    bus,
+    create: new CreateTodoCommandHandler(repo, scope),
+    complete: new CompleteTodoCommandHandler(repo, scope),
+    archive: new ArchiveTodoCommandHandler(repo, scope),
   };
 }
 
 describe("in-process todo event handlers", () => {
-  test("each event reaches its @eventHandler, and only after the transaction commits", async () => {
+  test("each event reaches its subscribed handler through millstream, and only after the transaction commits", async () => {
     const s = setup();
     const todo = await s.create.execute(new CreateTodoCommand({ title: "events" }));
     await s.complete.execute(new CompleteTodoCommand({ todoId: todo.id }));
     await s.archive.execute(new ArchiveTodoCommand({ todoId: todo.id }));
 
-    expect(s.order).toEqual(["commit", "TodoCreatedEvent", "commit", "TodoCompletedEvent", "commit", "TodoArchivedEvent"]);
-    expect(s.spies.created).toHaveBeenCalledWith(expect.any(TodoCreatedEvent));
-    expect(s.spies.completed).toHaveBeenCalledWith(expect.any(TodoCompletedEvent));
-    expect(s.spies.archived).toHaveBeenCalledWith(expect.objectContaining({ previousStatus: "completed" }));
-    expect(s.spies.archived.mock.calls[0]![0]).toBeInstanceOf(TodoArchivedEvent);
+    expect(s.order).toEqual(["commit", "todo.created.v1", "commit", "todo.completed.v1", "commit", "todo.archived.v1"]);
+    // Payloads went through JSON and the event schema: dates are real Dates again, and the meta carries the event id.
+    expect(s.spies.created).toHaveBeenCalledWith({ todoId: todo.id, title: "events" }, expect.objectContaining({ id: expect.any(String) }));
+    expect(s.spies.completed).toHaveBeenCalledWith({ todoId: todo.id, completedAt: expect.any(Date) }, expect.anything());
+    expect(s.spies.archived).toHaveBeenCalledWith(
+      { todoId: todo.id, previousStatus: "completed", archivedAt: expect.any(Date) },
+      expect.anything(),
+    );
   });
 
   test("a failing in-process handler cannot fail the committed command", async () => {

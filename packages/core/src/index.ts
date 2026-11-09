@@ -1,6 +1,5 @@
 export * from "./shared/domain-error";
 export * from "./shared/entity";
-export * from "./shared/events";
 export * from "./shared/id";
 export * from "./shared/identifiers";
 export * from "./shared/mapper";

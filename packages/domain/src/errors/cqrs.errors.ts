@@ -17,14 +17,6 @@ export class QueryHandlerNotFoundException extends DomainError<"QueryHandlerNotF
   }
 }
 
-export class EventHandlerNotFoundException extends DomainError<"EventHandlerNotFoundException"> {
-  readonly _tag = "EventHandlerNotFoundException";
-  readonly kind = "internal";
-  constructor(readonly eventId: string) {
-    super(`The event handler for the "${eventId}" event was not found!`);
-  }
-}
-
 export class InvalidCommandHandlerException extends DomainError<"InvalidCommandHandlerException"> {
   readonly _tag = "InvalidCommandHandlerException";
   readonly kind = "internal";
@@ -40,14 +32,5 @@ export class InvalidQueryHandlerException extends DomainError<"InvalidQueryHandl
   readonly decorator = "queryHandler";
   constructor() {
     super("Invalid query handler (missing @queryHandler() decorator?)");
-  }
-}
-
-export class InvalidEventHandlerException extends DomainError<"InvalidEventHandlerException"> {
-  readonly _tag = "InvalidEventHandlerException";
-  readonly kind = "internal";
-  readonly decorator = "eventHandler";
-  constructor() {
-    super("Invalid event handler (missing @eventHandler() decorator?)");
   }
 }
