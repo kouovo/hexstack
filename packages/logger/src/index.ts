@@ -25,3 +25,25 @@ export const logger = pino(loggerOptions);
 export type ILogger = Logger;
 
 export const createLogger = (module: string): ILogger => logger.child({ module });
+
+/** `{ debug, info, error }(msg, fields)` loggers, e.g. millstream's `Logger`. */
+export interface FieldsLogger {
+  debug(msg: string, fields?: Record<string, unknown>): void;
+  info(msg: string, fields?: Record<string, unknown>): void;
+  error(msg: string, fields?: Record<string, unknown>): void;
+}
+
+/** Adapts pino to message-first loggers; an `error` field becomes pino's serialized `err`. */
+const toPinoFields = (extra?: Record<string, unknown>) => {
+  if (!extra || !("error" in extra)) return extra ?? {};
+  const { error, ...rest } = extra;
+  return { ...rest, err: error };
+};
+
+export const toFieldsLogger = (target: ILogger): FieldsLogger => {
+  return {
+    debug: (msg, extra) => target.debug(toPinoFields(extra), msg),
+    info: (msg, extra) => target.info(toPinoFields(extra), msg),
+    error: (msg, extra) => target.error(toPinoFields(extra), msg),
+  };
+};
