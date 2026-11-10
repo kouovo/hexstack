@@ -1,4 +1,4 @@
-import { DomainEventScope, SessionService, SignUpCommandHandler, UserMapper } from "@app/application";
+import { DomainEventScope, SessionService, SignUpCommandHandler } from "@app/application";
 import {
   PasswordHash,
   UserEmail,
@@ -9,7 +9,7 @@ import {
   UserPasswordHashSpecification,
   UserRole,
 } from "@app/domain";
-import { afterAll, beforeAll, beforeEach, expect, test, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, expect, test } from "vitest";
 
 import { SESSION_TABLE, USER_TABLE } from "../db";
 import { SessionRepository } from "../session/session.repository";
@@ -59,15 +59,10 @@ test("the unique email index turns a racing duplicate into a thrown EmailAlready
 
 test("other database failures are not expected failures: they still throw, unchanged", async () => {
   // Unrelated role CHECK violations (23514) keep the original driver error.
-  const toPersistence = vi.spyOn(UserMapper, "toPersistence").mockImplementationOnce((user) => ({
-    ...UserMapper.toPersistence(user),
-    role: "superuser",
-  }));
-  try {
-    await expect(users.insert(newUser())).rejects.toMatchObject({ code: "23514" });
-  } finally {
-    toPersistence.mockRestore();
-  }
+  const user = newUser();
+  // Bypass UserRole validation so the mapped record carries a role the CHECK constraint rejects.
+  Object.defineProperty(user, "role", { value: { value: "superuser" } as unknown as UserRole });
+  await expect(users.insert(user)).rejects.toMatchObject({ code: "23514" });
 });
 
 test("a racing duplicate inside the sign-up transaction rolls back the account and its session", async () => {

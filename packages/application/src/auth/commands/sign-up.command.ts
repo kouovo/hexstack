@@ -14,7 +14,7 @@ import { z } from "@app/zod";
 
 import { type DomainEventScope, injectDomainEventScope } from "../../shared/domain-event-scope";
 import { defineCommand, type IRequestHandler, type RequestPayload } from "../../shared/mediator";
-import { UserMapper } from "../../user/user.mapper";
+import { toUserDTO } from "../../user/user.mapper";
 import { type IUserRepository, injectUserRepo } from "../../user/user.repository.port";
 import type { AuthResult } from "../auth.dto";
 import { type PasswordHasher, injectPasswordHasher } from "../password-hasher.port";
@@ -69,6 +69,6 @@ export class SignUpCommandHandler implements IRequestHandler<typeof SignUpComman
       track(user);
       return this.sessions.start(user.id);
     });
-    return { user: UserMapper.toResponse(user), token, expiresAt: session.expiresAt };
+    return { user: toUserDTO(user), token, expiresAt: session.expiresAt };
   }
 }

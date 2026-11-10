@@ -5,7 +5,7 @@ import { z } from "@app/zod";
 
 import { defineQuery, type IRequestHandler, type RequestPayload } from "../../shared/mediator";
 import type { IUserDTO } from "../user.dto";
-import { UserMapper } from "../user.mapper";
+import { toUserDTO } from "../user.mapper";
 import { type IUserRepository, injectUserRepo } from "../user.repository.port";
 
 export const listUsersQuery = z.object({
@@ -27,6 +27,6 @@ export class ListUsersQueryHandler implements IRequestHandler<typeof ListUsersQu
       .add(query.email, UserEmail.create, UserEmailSpecification)
       .build();
     const users = await this.userRepo.find(spec, { limit: query.limit });
-    return users.map((user) => UserMapper.toResponse(user));
+    return users.map(toUserDTO);
   }
 }
