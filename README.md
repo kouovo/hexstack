@@ -230,7 +230,7 @@ These are local trade-offs, not universal DDD rules:
 | Layer packages, with context folders inside them                        | Keep `packages/application` together instead of creating separate ports/usecases packages; related `todo` files span a few explicit layers                            |
 | Repository/specification-based reads                                    | The example query handlers use the same domain/repository vocabulary as commands; no separate SQL projection layer yet                                                |
 | Shared Zod schemas for inputs and value-object guards where appropriate | Less validation duplication, at the cost of a deliberate validation-library dependency in the core                                                                    |
-| One plain-object mapper in application                                  | `toEntity`, `toPersistence`, and `toResponse` stay together, without DI; stored record shapes are consequently visible to application code                            |
+| Pure mapper functions in application                                    | `toXEntity`, `toXRecord`, and `toXDTO` live in one file per aggregate, without DI; stored record shapes are consequently visible to application code                 |
 | Typed errors, ordinary throws                                           | Business failures extend `DomainError` with a literal `_tag` and typed fields; HTTP/RPC translate them centrally and BullMQ reads `retryable` (see [Errors](#errors)) |
 | Post-commit in-process events                                           | Logging/broadcast failures cannot roll back successful writes; required side effects use the outbox instead                                                           |
 
@@ -746,23 +746,23 @@ use case from a trusted operator context. Authorization at the RPC boundary does
 Keep the domain model, stored record, and public response distinct. Public responses should whitelist fields, not
 serialize an entire entity and attempt to remove secrets afterward.
 
-[TodoMapper](packages/application/src/todo/todo.mapper.ts) is a **plain object**, with no decorators or DI, implementing
-[IMapper](packages/core/src/shared/mapper.ts):
+[todo.mapper.ts](packages/application/src/todo/todo.mapper.ts) exports **separate pure functions**, with no class,
+shared object, decorators, or DI:
 
-| Method                  | Responsibility                                                                |
-| ----------------------- | ----------------------------------------------------------------------------- |
-| `toEntity(record)`      | Rehydrate a domain entity; normalize driver timestamps                        |
-| `toPersistence(entity)` | Produce the stored record, with database-facing names and `Date` values       |
-| `toResponse(entity)`    | Produce an explicit DTO with serializable primitive values and ISO timestamps |
+| Function               | Responsibility                                                                |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| `toTodoEntity(record)` | Rehydrate a domain entity; normalize driver timestamps                        |
+| `toTodoRecord(todo)`   | Produce the stored record, with database-facing names and `Date` values       |
+| `toTodoDTO(todo)`      | Produce an explicit DTO with serializable primitive values and ISO timestamps |
 
 `TodoRecord` is declared alongside the [repository port](packages/application/src/todo/todo.repository.port.ts).
-The SQL adapter imports the mapper from application, so application never imports persistence. Type checking verifies
+The SQL adapter imports the record mappers from application, so application never imports persistence. Type checking verifies
 that the SQL row remains compatible with the record contract.
 
 The trade-off is intentional: snake_case record fields are visible to application code. Separate persistence and
 response mappers would isolate that detail further, but would add more mapping code here.
 
-[UserMapper](packages/application/src/user/user.mapper.ts) and [SessionMapper](packages/application/src/auth/session.mapper.ts)
+[user.mapper.ts](packages/application/src/user/user.mapper.ts) and [session.mapper.ts](packages/application/src/auth/session.mapper.ts)
 follow the same pattern. A public user DTO contains only `id`, `email`, `role`, and `createdAt`—never a hash or token.
 Request schemas are currently reused from commands/queries instead of maintaining separate request-DTO classes.
 Introduce separate versioned transport contracts when client compatibility requires that independence.
