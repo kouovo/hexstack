@@ -6,6 +6,7 @@ export * from "./src/pubsub";
 export * from "./src/queue";
 export * from "./src/transaction";
 export * from "./src/shared/domain-event-scope";
+export * from "./src/shared/mediator";
 export * from "./src/todo";
 export * from "./src/auth";
 export * from "./src/user";

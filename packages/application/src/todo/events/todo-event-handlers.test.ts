@@ -6,9 +6,9 @@ import { InProcessEventBus } from "../../events/in-process-event-bus";
 import { IN_PROCESS_EVENT_SUBSCRIPTIONS } from "../../events/subscriptions";
 import { DomainEventScope } from "../../shared/domain-event-scope";
 import type { ApplicationTransactionPort } from "../../transaction";
-import { ArchiveTodoCommand, ArchiveTodoCommandHandler } from "../commands/archive-todo.command";
-import { CompleteTodoCommand, CompleteTodoCommandHandler } from "../commands/complete-todo.command";
-import { CreateTodoCommand, CreateTodoCommandHandler } from "../commands/create-todo.command";
+import { ArchiveTodoCommandHandler } from "../commands/archive-todo.command";
+import { CompleteTodoCommandHandler } from "../commands/complete-todo.command";
+import { CreateTodoCommandHandler } from "../commands/create-todo.command";
 import type { ITodoRepository } from "../todo.repository.port";
 import { TodoArchivedLogEventHandler } from "./todo-archived-log-event.handler";
 import { TodoCompletedLogEventHandler } from "./todo-completed-log-event.handler";
@@ -58,9 +58,9 @@ function setup() {
 describe("in-process todo event handlers", () => {
   test("each event reaches its subscribed handler through millstream, and only after the transaction commits", async () => {
     const s = setup();
-    const todo = await s.create.execute(new CreateTodoCommand({ title: "events" }));
-    await s.complete.execute(new CompleteTodoCommand({ todoId: todo.id }));
-    await s.archive.execute(new ArchiveTodoCommand({ todoId: todo.id }));
+    const todo = await s.create.execute({ title: "events" });
+    await s.complete.execute({ todoId: todo.id });
+    await s.archive.execute({ todoId: todo.id });
 
     expect(s.order).toEqual(["commit", "todo.created.v1", "commit", "todo.completed.v1", "commit", "todo.archived.v1"]);
     // Payloads went through JSON and the event schema: dates are real Dates again, and the meta carries the event id.
@@ -77,14 +77,14 @@ describe("in-process todo event handlers", () => {
     s.spies.created.mockImplementation(() => {
       throw new Error("handler exploded");
     });
-    await expect(s.create.execute(new CreateTodoCommand({ title: "still created" }))).resolves.toMatchObject({ status: "open" });
+    await expect(s.create.execute({ title: "still created" })).resolves.toMatchObject({ status: "open" });
   });
 
   test("archive goes through the status guard", async () => {
     const s = setup();
-    const todo = await s.create.execute(new CreateTodoCommand({ title: "archive twice" }));
-    await expect(s.archive.execute(new ArchiveTodoCommand({ todoId: todo.id }))).resolves.toMatchObject({ status: "archived" });
-    await expect(s.archive.execute(new ArchiveTodoCommand({ todoId: todo.id }))).rejects.toMatchObject({
+    const todo = await s.create.execute({ title: "archive twice" });
+    await expect(s.archive.execute({ todoId: todo.id })).resolves.toMatchObject({ status: "archived" });
+    await expect(s.archive.execute({ todoId: todo.id })).rejects.toMatchObject({
       _tag: "TodoTransitionNotAllowedError",
       from: "archived",
       to: "archived",

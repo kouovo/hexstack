@@ -12,10 +12,10 @@ import { describe, expect, test, vi } from "vitest";
 import { uncached } from "../cache/cache.test-helper";
 import { DomainEventScope } from "../shared/domain-event-scope";
 import type { ApplicationTransactionPort } from "../transaction";
-import { CompleteTodoCommand, CompleteTodoCommandHandler } from "./commands/complete-todo.command";
-import { CreateTodoCommand, CreateTodoCommandHandler } from "./commands/create-todo.command";
+import { CompleteTodoCommandHandler } from "./commands/complete-todo.command";
+import { CreateTodoCommandHandler } from "./commands/create-todo.command";
 import { NOTIFY_TODO_COMPLETED_JOB_NAME, NotifyTodoCompletedJobHandler } from "./jobs/notify-todo-completed.job";
-import { ListTodosQuery, ListTodosQueryHandler } from "./queries/list-todos.query";
+import { ListTodosQueryHandler } from "./queries/list-todos.query";
 import { DispatchTodoCompletedOutboxHandler } from "./todo-outbox-handlers";
 import type { ITodoRepository } from "./todo.repository.port";
 
@@ -83,10 +83,10 @@ function setup() {
 describe("todo use cases", () => {
   test("complete publishes TodoCompletedEvent to the outbox inside the transaction", async () => {
     const s = setup();
-    const created = await s.create.execute(new CreateTodoCommand({ title: "ship it" }));
+    const created = await s.create.execute({ title: "ship it" });
     s.outbox.publishMany.mockClear();
 
-    const completed = await s.complete.execute(new CompleteTodoCommand({ todoId: created.id }));
+    const completed = await s.complete.execute({ todoId: created.id });
 
     expect(completed.status).toBe("completed");
     expect(s.outbox.publishMany).toHaveBeenCalledExactlyOnceWith([
@@ -98,7 +98,7 @@ describe("todo use cases", () => {
 
   test("unknown todo throws TodoNotFoundError and rolls back", async () => {
     const s = setup();
-    await expect(s.complete.execute(new CompleteTodoCommand({ todoId: "todo_missing" }))).rejects.toMatchObject({
+    await expect(s.complete.execute({ todoId: "todo_missing" })).rejects.toMatchObject({
       _tag: "TodoNotFoundError",
       todoId: "todo_missing",
     });
@@ -107,13 +107,13 @@ describe("todo use cases", () => {
 
   test("completing twice throws TodoTransitionNotAllowedError; no write, outbox row or broadcast", async () => {
     const s = setup();
-    const created = await s.create.execute(new CreateTodoCommand({ title: "once" }));
-    await s.complete.execute(new CompleteTodoCommand({ todoId: created.id }));
+    const created = await s.create.execute({ title: "once" });
+    await s.complete.execute({ todoId: created.id });
     s.outbox.publishMany.mockClear();
     s.eventBus.publishMany.mockClear();
     const update = vi.spyOn(s.repo, "updateIfStatus");
 
-    await expect(s.complete.execute(new CompleteTodoCommand({ todoId: created.id }))).rejects.toMatchObject({
+    await expect(s.complete.execute({ todoId: created.id })).rejects.toMatchObject({
       _tag: "TodoTransitionNotAllowedError",
       from: "completed",
       to: "completed",
@@ -126,10 +126,10 @@ describe("todo use cases", () => {
 
   test("losing the conditional UPDATE race throws TodoModifiedConcurrentlyError; rollback, no outbox append", async () => {
     const s = setup();
-    const created = await s.create.execute(new CreateTodoCommand({ title: "race" }));
+    const created = await s.create.execute({ title: "race" });
     s.outbox.publishMany.mockClear();
     vi.spyOn(s.repo, "updateIfStatus").mockResolvedValueOnce(false);
-    await expect(s.complete.execute(new CompleteTodoCommand({ todoId: created.id }))).rejects.toMatchObject({
+    await expect(s.complete.execute({ todoId: created.id })).rejects.toMatchObject({
       _tag: "TodoModifiedConcurrentlyError",
       todoId: created.id,
       expectedStatus: "open",
@@ -140,10 +140,10 @@ describe("todo use cases", () => {
 
   test("infrastructure failures are thrown unchanged", async () => {
     const s = setup();
-    const created = await s.create.execute(new CreateTodoCommand({ title: "db down" }));
+    const created = await s.create.execute({ title: "db down" });
     const failure = new Error("connection terminated");
     vi.spyOn(s.repo, "updateIfStatus").mockRejectedValueOnce(failure);
-    await expect(s.complete.execute(new CompleteTodoCommand({ todoId: created.id }))).rejects.toBe(failure);
+    await expect(s.complete.execute({ todoId: created.id })).rejects.toBe(failure);
     expect(s.order.at(-1)).toBe("rollback");
   });
 });
@@ -151,13 +151,13 @@ describe("todo use cases", () => {
 describe("list query", () => {
   test("optional status filter becomes a spec; no filter returns everything", async () => {
     const s = setup();
-    const a = await s.create.execute(new CreateTodoCommand({ title: "a" }));
-    await s.create.execute(new CreateTodoCommand({ title: "b" }));
-    await s.complete.execute(new CompleteTodoCommand({ todoId: a.id }));
+    const a = await s.create.execute({ title: "a" });
+    await s.create.execute({ title: "b" });
+    await s.complete.execute({ todoId: a.id });
 
-    expect(await s.list.execute(new ListTodosQuery())).toHaveLength(2);
-    expect(await s.list.execute(new ListTodosQuery({ status: "completed" }))).toEqual([expect.objectContaining({ id: a.id })]);
-    expect(await s.list.execute(new ListTodosQuery({ status: "archived" }))).toEqual([]);
+    expect(await s.list.execute({ limit: 50 })).toHaveLength(2);
+    expect(await s.list.execute({ status: "completed", limit: 50 })).toEqual([expect.objectContaining({ id: a.id })]);
+    expect(await s.list.execute({ status: "archived", limit: 50 })).toEqual([]);
   });
 });
 

@@ -1,7 +1,6 @@
 import { PassThrough } from "node:stream";
 
-import { USER_REPO } from "@app/application";
-import { CommandBus } from "@app/cqrs";
+import { AssignRoleCommand, MEDIATOR, USER_REPO } from "@app/application";
 import { type InjectionToken } from "@app/di";
 import { PasswordHash, UserEmail, UserEmailSpecification, UserEntity, UserPasswordHashSpecification } from "@app/domain";
 import { expect, test, vi } from "vitest";
@@ -17,7 +16,7 @@ function setup(found = true) {
   const findOne = vi.fn(async () => (found ? user : undefined));
   const resolve = vi.fn(async (token: InjectionToken<unknown>): Promise<unknown> => {
     if (token === USER_REPO) return { findOne };
-    if (token === CommandBus) return { execute };
+    if (token === MEDIATOR) return { execute };
     throw new Error("Unexpected service");
   });
   const stdout = new PassThrough();
@@ -42,7 +41,7 @@ test("an operator can promote an existing account, without outputting secrets", 
   const s = setup();
   expect(await s.run("ADA@example.com", "admin", "--json")).toBe(0);
   expect(s.findOne).toHaveBeenCalled();
-  expect(s.execute).toHaveBeenCalledWith(expect.objectContaining({ userId: s.user.id.value, role: "admin" }));
+  expect(s.execute).toHaveBeenCalledWith(AssignRoleCommand, expect.objectContaining({ userId: s.user.id.value, role: "admin" }));
   expect(s.output()).toContain('"role":"admin"');
   expect(s.output()).not.toContain("password");
 });

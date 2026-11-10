@@ -1,21 +1,18 @@
-import { type IQueryHandler, Query, queryHandler } from "@app/cqrs";
 import { singleton } from "@app/di";
-import { UserId, UserIdSpecification, rolePermissions, SessionUserMissingError } from "@app/domain";
+import { UserId, UserIdSpecification, userIdSchema, rolePermissions, SessionUserMissingError } from "@app/domain";
+import { z } from "@app/zod";
 
+import { defineQuery, type IRequestHandler, type RequestPayload } from "../../shared/mediator";
 import { UserMapper } from "../../user/user.mapper";
 import { type IUserRepository, injectUserRepo } from "../../user/user.repository.port";
 import type { ICurrentUserDTO } from "../auth.dto";
 
-export class GetCurrentUserQuery extends Query {
-  constructor(public readonly userId: string) {
-    super();
-  }
-}
+export const GetCurrentUserQuery = defineQuery("auth.current-user", z.object({ userId: userIdSchema })).returns<ICurrentUserDTO>();
+export type GetCurrentUserQuery = RequestPayload<typeof GetCurrentUserQuery>;
 
 /** The signed-in user plus their effective permissions, so clients can hide what they cannot do. */
-@queryHandler(GetCurrentUserQuery)
 @singleton()
-export class GetCurrentUserQueryHandler implements IQueryHandler<GetCurrentUserQuery, ICurrentUserDTO> {
+export class GetCurrentUserQueryHandler implements IRequestHandler<typeof GetCurrentUserQuery> {
   constructor(@injectUserRepo() private readonly users: IUserRepository) {}
 
   async execute(query: GetCurrentUserQuery): Promise<ICurrentUserDTO> {

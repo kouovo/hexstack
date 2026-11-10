@@ -1,9 +1,6 @@
 import {
-  ArchiveTodoCommand,
   ArchiveTodoCommandHandler,
-  CompleteTodoCommand,
   CompleteTodoCommandHandler,
-  CreateTodoCommand,
   CreateTodoCommandHandler,
   NotifyTodoCompletedJobHandler,
   DomainEventScope,
@@ -140,11 +137,11 @@ test("markCompletionNotified succeeds once, and only for completed todos", async
 
 test("complete commits the todo row and its outbox row together", async () => {
   const { create, complete } = handlers();
-  const created = await create.execute(new CreateTodoCommand({ title: "end to end" }));
+  const created = await create.execute({ title: "end to end" });
   // TodoCreatedEvent has no durable consumer, so it is not stored.
   expect(await pending()).toEqual([]);
 
-  await complete.execute(new CompleteTodoCommand({ todoId: created.id }));
+  await complete.execute({ todoId: created.id });
   const [entry] = await pending();
   expect(entry).toMatchObject({ id: expect.stringMatching(/^event/), eventName: TodoCompletedEvent.name });
   expect(entry!.event).toEqual({ todoId: created.id, completedAt: expect.any(String) });
@@ -152,8 +149,8 @@ test("complete commits the todo row and its outbox row together", async () => {
 
 test("archive persists the status but writes no outbox row (no durable consumer)", async () => {
   const { create, archive } = handlers();
-  const created = await create.execute(new CreateTodoCommand({ title: "archive me" }));
-  await archive.execute(new ArchiveTodoCommand({ todoId: created.id }));
+  const created = await create.execute({ title: "archive me" });
+  await archive.execute({ todoId: created.id });
   expect((await repo.findOne(new TodoIdSpecification(TodoId.create(created.id))))?.status.value).toBe("archived");
   expect(await pending()).toEqual([]);
 });
@@ -164,17 +161,17 @@ test("a failing outbox insert rolls back the status change", async () => {
       throw new Error("outbox down");
     },
   };
-  const created = await handlers().create.execute(new CreateTodoCommand({ title: "atomic" }));
+  const created = await handlers().create.execute({ title: "atomic" });
   const complete = new CompleteTodoCommandHandler(repo, scope(brokenOutbox));
 
-  await expect(complete.execute(new CompleteTodoCommand({ todoId: created.id }))).rejects.toThrow("outbox down");
+  await expect(complete.execute({ todoId: created.id })).rejects.toThrow("outbox down");
   expect((await repo.findOne(new TodoIdSpecification(TodoId.create(created.id))))?.status.value).toBe("open");
 });
 
 test("job handler is idempotent against the real table", async () => {
   const { create, complete } = handlers();
-  const created = await create.execute(new CreateTodoCommand({ title: "deliver twice" }));
-  await complete.execute(new CompleteTodoCommand({ todoId: created.id }));
+  const created = await create.execute({ title: "deliver twice" });
+  await complete.execute({ todoId: created.id });
 
   const job = new NotifyTodoCompletedJobHandler(repo, {
     get: async () => undefined,
@@ -217,12 +214,12 @@ test("a thrown domain error after a write rolls the real transaction back: no to
 
 test("completing a completed todo through the real handler throws and leaves the row and outbox untouched", async () => {
   const { create, complete } = handlers();
-  const created = await create.execute(new CreateTodoCommand({ title: "complete twice" }));
-  await complete.execute(new CompleteTodoCommand({ todoId: created.id }));
+  const created = await create.execute({ title: "complete twice" });
+  await complete.execute({ todoId: created.id });
   const before = await repo.findOne(new TodoIdSpecification(TodoId.create(created.id)));
   await db.pglite.exec(`DELETE FROM ${OUTBOX_QUEUE_TABLE};`); // relay the first completion
 
-  await expect(complete.execute(new CompleteTodoCommand({ todoId: created.id }))).rejects.toMatchObject({
+  await expect(complete.execute({ todoId: created.id })).rejects.toMatchObject({
     _tag: "TodoTransitionNotAllowedError",
     from: "completed",
   });

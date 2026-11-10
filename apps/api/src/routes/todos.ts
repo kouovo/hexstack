@@ -1,6 +1,5 @@
-import { type ITodoDTO, ListTodosQuery, listTodosQuery } from "@app/application";
+import { ListTodosQuery, listTodosQuery, MEDIATOR, type Mediator } from "@app/application";
 import { requestContextStorage } from "@app/context";
-import { QueryBus } from "@app/cqrs";
 import { container } from "@app/di";
 import { ForbiddenException, roleHasPermissions, UnauthorizedException } from "@app/domain";
 import type { Context } from "hono";
@@ -23,6 +22,6 @@ export async function listTodos(c: Context): Promise<Response> {
     return c.json({ _tag: "InvalidInput", message: parsed.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  const todos = await container.resolve(QueryBus).execute<ITodoDTO[]>(new ListTodosQuery(parsed.data ?? {}));
+  const todos = await container.resolve<Mediator>(MEDIATOR).query(ListTodosQuery, parsed.data ?? {});
   return c.json({ todos });
 }

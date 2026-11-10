@@ -1,4 +1,3 @@
-import { Command, commandHandler, type ICommandHandler } from "@app/cqrs";
 import { singleton } from "@app/di";
 import {
   UserEmail,
@@ -10,6 +9,7 @@ import {
 } from "@app/domain";
 import { z } from "@app/zod";
 
+import { defineCommand, type IRequestHandler, type RequestPayload } from "../../shared/mediator";
 import { UserMapper } from "../../user/user.mapper";
 import { type IUserRepository, injectUserRepo } from "../../user/user.repository.port";
 import type { AuthResult } from "../auth.dto";
@@ -25,20 +25,11 @@ export const signInCommand = z.object({
 
 export type ISignInCommand = z.infer<typeof signInCommand>;
 
-export class SignInCommand extends Command implements ISignInCommand {
-  public readonly email: string;
-  public readonly password: string;
+export const SignInCommand = defineCommand("auth.sign-in", signInCommand).returns<AuthResult>();
+export type SignInCommand = RequestPayload<typeof SignInCommand>;
 
-  constructor(props: ISignInCommand) {
-    super(props);
-    this.email = props.email;
-    this.password = props.password;
-  }
-}
-
-@commandHandler(SignInCommand)
 @singleton()
-export class SignInCommandHandler implements ICommandHandler<SignInCommand, AuthResult> {
+export class SignInCommandHandler implements IRequestHandler<typeof SignInCommand> {
   constructor(
     @injectUserRepo() private readonly users: IUserRepository,
     @injectPasswordHasher() private readonly hasher: PasswordHasher,

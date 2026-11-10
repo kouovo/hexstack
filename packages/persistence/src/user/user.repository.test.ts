@@ -1,4 +1,4 @@
-import { DomainEventScope, SessionService, SignUpCommand, SignUpCommandHandler, UserMapper } from "@app/application";
+import { DomainEventScope, SessionService, SignUpCommandHandler, UserMapper } from "@app/application";
 import {
   PasswordHash,
   UserEmail,
@@ -88,9 +88,10 @@ test("a racing duplicate inside the sign-up transaction rolls back the account a
   const findOne = users.findOne.bind(users);
   users.findOne = async () => undefined;
   try {
-    await expect(
-      handler.execute(new SignUpCommand({ email: "ada@example.com", password: "correct horse", clientKey: "test" })),
-    ).rejects.toMatchObject({ _tag: "EmailAlreadyRegisteredError", detectedBy: "unique-constraint" });
+    await expect(handler.execute({ email: "ada@example.com", password: "correct horse", clientKey: "test" })).rejects.toMatchObject({
+      _tag: "EmailAlreadyRegisteredError",
+      detectedBy: "unique-constraint",
+    });
   } finally {
     users.findOne = findOne;
   }
@@ -163,9 +164,9 @@ test("sign-up rolls back the account when creating its session fails", async () 
       { publishMany: async () => [] },
     ),
   );
-  await expect(
-    handler.execute(new SignUpCommand({ email: "ada@example.com", password: "correct horse", clientKey: "test" })),
-  ).rejects.toThrow("session insert failed");
+  await expect(handler.execute({ email: "ada@example.com", password: "correct horse", clientKey: "test" })).rejects.toThrow(
+    "session insert failed",
+  );
   expect(await users.find(undefined, { limit: 10 })).toEqual([]);
   expect(await db.queryBuilder.selectFrom(SESSION_TABLE).selectAll().execute()).toEqual([]);
 });

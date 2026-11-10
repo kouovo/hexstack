@@ -5,36 +5,35 @@ import {
   completeTodoCommand,
   CreateTodoCommand,
   createTodoCommand,
-  type ITodoDTO,
   ListTodosQuery,
   listTodosQuery,
+  MEDIATOR,
+  type Mediator,
 } from "@app/application";
-import { CommandBus, QueryBus } from "@app/cqrs";
 import { container } from "@app/di";
 
 import { rpcMutation, rpcQuery } from "../procedure";
 
-const commandBus = () => container.resolve(CommandBus);
-const queryBus = () => container.resolve(QueryBus);
+const mediator = () => container.resolve<Mediator>(MEDIATOR);
 
 const create = rpcMutation
   .meta({ permissions: { todo: ["create"] } })
   .input(createTodoCommand)
-  .handler(({ input }) => commandBus().execute<CreateTodoCommand, ITodoDTO>(new CreateTodoCommand(input)));
+  .handler(({ input }) => mediator().execute(CreateTodoCommand, input));
 
 const complete = rpcMutation
   .meta({ permissions: { todo: ["complete"] } })
   .input(completeTodoCommand)
-  .handler(({ input }) => commandBus().execute<CompleteTodoCommand, ITodoDTO>(new CompleteTodoCommand(input)));
+  .handler(({ input }) => mediator().execute(CompleteTodoCommand, input));
 
 const archive = rpcMutation
   .meta({ permissions: { todo: ["archive"] } })
   .input(archiveTodoCommand)
-  .handler(({ input }) => commandBus().execute<ArchiveTodoCommand, ITodoDTO>(new ArchiveTodoCommand(input)));
+  .handler(({ input }) => mediator().execute(ArchiveTodoCommand, input));
 
 const list = rpcQuery
   .meta({ permissions: { todo: ["read"] } })
   .input(listTodosQuery.partial().optional())
-  .handler(({ input }) => queryBus().execute<ITodoDTO[]>(new ListTodosQuery(input ?? {})));
+  .handler(({ input }) => mediator().query(ListTodosQuery, input ?? {}));
 
 export const todoRouter = { create, complete, archive, list };

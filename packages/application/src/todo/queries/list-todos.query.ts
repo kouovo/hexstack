@@ -1,5 +1,4 @@
 import { specificationBuilder } from "@app/core";
-import { type IQueryHandler, Query, queryHandler } from "@app/cqrs";
 import { singleton } from "@app/di";
 import {
   type ITodoSpecVisitor,
@@ -12,6 +11,7 @@ import {
 import { z } from "@app/zod";
 
 import { type CachePort, injectCache, jitteredTtlSeconds } from "../../cache";
+import { defineQuery, type IRequestHandler, type RequestPayload } from "../../shared/mediator";
 import { TODO_LIST_CACHE_NAMESPACE } from "../todo-cache-invalidation";
 import { todoListQueryKey } from "../todo-list-cache-key";
 import type { ITodoDTO } from "../todo.dto";
@@ -25,21 +25,11 @@ export const listTodosQuery = z.object({
 
 export type IListTodosQuery = z.input<typeof listTodosQuery>;
 
-export class ListTodosQuery extends Query {
-  public readonly status?: string;
-  public readonly limit: number;
+export const ListTodosQuery = defineQuery("todo.list", listTodosQuery).returns<ITodoDTO[]>();
+export type ListTodosQuery = RequestPayload<typeof ListTodosQuery>;
 
-  constructor(props: IListTodosQuery = {}) {
-    super();
-    const parsed = listTodosQuery.parse(props);
-    this.status = parsed.status;
-    this.limit = parsed.limit;
-  }
-}
-
-@queryHandler(ListTodosQuery)
 @singleton()
-export class ListTodosQueryHandler implements IQueryHandler<ListTodosQuery, ITodoDTO[]> {
+export class ListTodosQueryHandler implements IRequestHandler<typeof ListTodosQuery> {
   static readonly TODO_LIST_TTL_SECONDS = 30;
 
   constructor(

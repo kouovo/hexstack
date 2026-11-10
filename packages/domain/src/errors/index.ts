@@ -1,6 +1,5 @@
 export * from "./auth.errors";
 export * from "./common.errors";
-export * from "./cqrs.errors";
 export * from "./storage.errors";
 export * from "./storage-configuration.errors";
 export * from "./todo.errors";

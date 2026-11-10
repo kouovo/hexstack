@@ -1,9 +1,9 @@
 import { specificationBuilder } from "@app/core";
-import { type IQueryHandler, Query, queryHandler } from "@app/cqrs";
 import { singleton } from "@app/di";
 import { type IUserSpecVisitor, type IUserState, UserEmail, UserEmailSpecification, userEmailSchema, type UserEntity } from "@app/domain";
 import { z } from "@app/zod";
 
+import { defineQuery, type IRequestHandler, type RequestPayload } from "../../shared/mediator";
 import type { IUserDTO } from "../user.dto";
 import { UserMapper } from "../user.mapper";
 import { type IUserRepository, injectUserRepo } from "../user.repository.port";
@@ -15,21 +15,11 @@ export const listUsersQuery = z.object({
 
 export type IListUsersQuery = z.input<typeof listUsersQuery>;
 
-export class ListUsersQuery extends Query {
-  public readonly email?: string;
-  public readonly limit: number;
+export const ListUsersQuery = defineQuery("user.list", listUsersQuery).returns<IUserDTO[]>();
+export type ListUsersQuery = RequestPayload<typeof ListUsersQuery>;
 
-  constructor(props: IListUsersQuery = {}) {
-    super();
-    const parsed = listUsersQuery.parse(props);
-    this.email = parsed.email;
-    this.limit = parsed.limit;
-  }
-}
-
-@queryHandler(ListUsersQuery)
 @singleton()
-export class ListUsersQueryHandler implements IQueryHandler<ListUsersQuery, IUserDTO[]> {
+export class ListUsersQueryHandler implements IRequestHandler<typeof ListUsersQuery> {
   constructor(@injectUserRepo() private readonly userRepo: IUserRepository) {}
 
   async execute(query: ListUsersQuery): Promise<IUserDTO[]> {
