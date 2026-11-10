@@ -1,4 +1,3 @@
-import { Command, commandHandler, type ICommandHandler } from "@app/cqrs";
 import { singleton } from "@app/di";
 import {
   Password,
@@ -14,6 +13,7 @@ import {
 import { z } from "@app/zod";
 
 import { type DomainEventScope, injectDomainEventScope } from "../../shared/domain-event-scope";
+import { defineCommand, type IRequestHandler, type RequestPayload } from "../../shared/mediator";
 import { UserMapper } from "../../user/user.mapper";
 import { type IUserRepository, injectUserRepo } from "../../user/user.repository.port";
 import type { AuthResult } from "../auth.dto";
@@ -26,27 +26,19 @@ export const signUpCommand = z.object({
   password: passwordSchema,
 });
 
-export type ISignUpCommand = z.infer<typeof signUpCommand> & {
-  /** Rate-limit key for an anonymous caller (client address). Filled in by the transport, never by the client. */
-  clientKey: string;
-};
+export type ISignUpCommand = z.infer<typeof signUpCommand>;
 
-export class SignUpCommand extends Command implements ISignUpCommand {
-  public readonly email: string;
-  public readonly password: string;
-  public readonly clientKey: string;
+export const SignUpCommand = defineCommand(
+  "auth.sign-up",
+  signUpCommand.extend({
+    /** Rate-limit key for an anonymous caller (client address). Filled in by the transport, never by the client. */
+    clientKey: z.string().min(1),
+  }),
+).returns<AuthResult>();
+export type SignUpCommand = RequestPayload<typeof SignUpCommand>;
 
-  constructor(props: ISignUpCommand) {
-    super(props);
-    this.email = props.email;
-    this.password = props.password;
-    this.clientKey = props.clientKey;
-  }
-}
-
-@commandHandler(SignUpCommand)
 @singleton()
-export class SignUpCommandHandler implements ICommandHandler<SignUpCommand, AuthResult> {
+export class SignUpCommandHandler implements IRequestHandler<typeof SignUpCommand> {
   constructor(
     @injectUserRepo() private readonly users: IUserRepository,
     @injectPasswordHasher() private readonly hasher: PasswordHasher,

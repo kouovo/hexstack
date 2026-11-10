@@ -13,13 +13,13 @@ import { describe, expect, test, vi } from "vitest";
 
 import { DomainEventScope } from "../shared/domain-event-scope";
 import type { ApplicationTransactionPort } from "../transaction";
-import { AssignRoleCommand, AssignRoleCommandHandler } from "../user/commands/assign-role.command";
+import { AssignRoleCommandHandler } from "../user/commands/assign-role.command";
 import type { IUserRepository } from "../user/user.repository.port";
-import { SignInCommand, SignInCommandHandler } from "./commands/sign-in.command";
-import { SignOutAllCommand, SignOutAllCommandHandler, SignOutCommand, SignOutCommandHandler } from "./commands/sign-out.command";
-import { SignUpCommand, SignUpCommandHandler } from "./commands/sign-up.command";
+import { SignInCommandHandler } from "./commands/sign-in.command";
+import { SignOutAllCommandHandler, SignOutCommandHandler } from "./commands/sign-out.command";
+import { SignUpCommandHandler } from "./commands/sign-up.command";
 import type { PasswordHasher } from "./password-hasher.port";
-import { GetCurrentUserQuery, GetCurrentUserQueryHandler } from "./queries/get-current-user.query";
+import { GetCurrentUserQueryHandler } from "./queries/get-current-user.query";
 import type { RateLimiter } from "./rate-limiter.port";
 import type { ISessionRepository } from "./session.repository.port";
 import { SessionService } from "./session.service";
@@ -118,7 +118,7 @@ const ada = { email: "Ada@Example.com", password: "correct horse", clientKey: "1
 describe("sign-up / sign-in", () => {
   test("sign-up creates a member with a hashed password and a working session", async () => {
     const s = setup();
-    const result = await s.signUp.execute(new SignUpCommand(ada));
+    const result = await s.signUp.execute(ada);
     expect(result.user).toMatchObject({ email: "ada@example.com", role: "member" });
     expect(result.user).not.toHaveProperty("passwordHash");
     expect([...s.users.rows.values()][0]!.passwordHash.value).toBe("$fake$correct horse");
@@ -128,7 +128,7 @@ describe("sign-up / sign-in", () => {
   test("the domain password policy is enforced before anything is hashed or stored", async () => {
     const s = setup();
     vi.mocked(fakeHasher.hash).mockClear();
-    await expect(s.signUp.execute(new SignUpCommand({ ...ada, password: "short" }))).rejects.toMatchObject({
+    await expect(s.signUp.execute({ ...ada, password: "short" })).rejects.toMatchObject({
       _tag: "PasswordPolicyViolationError",
       rule: "Password must be at least 8 characters",
     });
@@ -138,9 +138,9 @@ describe("sign-up / sign-in", () => {
 
   test("duplicate email (lookup) throws EmailAlreadyRegisteredError, no second hash", async () => {
     const s = setup();
-    await s.signUp.execute(new SignUpCommand(ada));
+    await s.signUp.execute(ada);
     vi.mocked(fakeHasher.hash).mockClear();
-    await expect(s.signUp.execute(new SignUpCommand({ ...ada, email: "ADA@example.com" }))).rejects.toMatchObject({
+    await expect(s.signUp.execute({ ...ada, email: "ADA@example.com" })).rejects.toMatchObject({
       _tag: "EmailAlreadyRegisteredError",
       detectedBy: "lookup",
     });
@@ -149,11 +149,11 @@ describe("sign-up / sign-in", () => {
 
   test("racing duplicate rolls back: no session, no event", async () => {
     const s = setup();
-    await s.signUp.execute(new SignUpCommand(ada));
+    await s.signUp.execute(ada);
     s.outbox.publishMany.mockClear();
     const sessionsBefore = s.sessionRows.rows.size;
     vi.spyOn(s.users, "findOne").mockResolvedValueOnce(undefined);
-    await expect(s.signUp.execute(new SignUpCommand(ada))).rejects.toMatchObject({
+    await expect(s.signUp.execute(ada)).rejects.toMatchObject({
       _tag: "EmailAlreadyRegisteredError",
       detectedBy: "unique-constraint",
     });
@@ -164,20 +164,20 @@ describe("sign-up / sign-in", () => {
 
   test("sign-in issues a brand-new session each time", async () => {
     const s = setup();
-    const up = await s.signUp.execute(new SignUpCommand(ada));
-    const a = await s.signIn.execute(new SignInCommand(ada));
-    const b = await s.signIn.execute(new SignInCommand(ada));
+    const up = await s.signUp.execute(ada);
+    const a = await s.signIn.execute(ada);
+    const b = await s.signIn.execute(ada);
     expect(new Set([up.token, a.token, b.token]).size).toBe(3);
     expect(s.sessionRows.rows.size).toBe(3);
   });
 
   test("unknown email and wrong password throw distinct errors; no session is created", async () => {
     const s = setup();
-    const up = await s.signUp.execute(new SignUpCommand(ada));
-    await expect(s.signIn.execute(new SignInCommand({ ...ada, email: "bob@example.com" }))).rejects.toMatchObject({
+    const up = await s.signUp.execute(ada);
+    await expect(s.signIn.execute({ ...ada, email: "bob@example.com" })).rejects.toMatchObject({
       _tag: "AccountNotFoundError",
     });
-    await expect(s.signIn.execute(new SignInCommand({ ...ada, password: "wrong password" }))).rejects.toMatchObject({
+    await expect(s.signIn.execute({ ...ada, password: "wrong password" })).rejects.toMatchObject({
       _tag: "IncorrectPasswordError",
       userId: up.user.id,
     });
@@ -186,11 +186,11 @@ describe("sign-up / sign-in", () => {
 
   test("rate limit is checked before hashing; buckets are per account for sign-in, per client for sign-up", async () => {
     const s = setup();
-    await s.signUp.execute(new SignUpCommand(ada));
+    await s.signUp.execute(ada);
     expect(s.limiter.consume).toHaveBeenLastCalledWith(expect.objectContaining({ name: "sign-up" }), "127.0.0.1");
     s.limiter.consume.mockResolvedValueOnce(false);
     vi.mocked(fakeHasher.verify).mockClear();
-    await expect(s.signIn.execute(new SignInCommand(ada))).rejects.toMatchObject({
+    await expect(s.signIn.execute(ada)).rejects.toMatchObject({
       _tag: "RateLimitedError",
       policy: "sign-in",
       retryAfterSeconds: 60,
@@ -199,7 +199,7 @@ describe("sign-up / sign-in", () => {
     expect(s.limiter.consume).toHaveBeenLastCalledWith(expect.objectContaining({ name: "sign-in" }), "ada@example.com");
     s.limiter.consume.mockResolvedValueOnce(false);
     vi.mocked(fakeHasher.hash).mockClear();
-    await expect(s.signUp.execute(new SignUpCommand({ ...ada, email: "other@example.com" }))).rejects.toMatchObject({
+    await expect(s.signUp.execute({ ...ada, email: "other@example.com" })).rejects.toMatchObject({
       _tag: "RateLimitedError",
       policy: "sign-up",
     });
@@ -208,13 +208,13 @@ describe("sign-up / sign-in", () => {
 
   test("an unavailable rate limiter fails closed for both commands, before any hashing", async () => {
     const s = setup();
-    await s.signUp.execute(new SignUpCommand(ada));
+    await s.signUp.execute(ada);
     const unavailable = new RateLimiterUnavailableError({ policy: "sign-in", cause: new Error("ECONNREFUSED") });
     s.limiter.consume.mockRejectedValue(unavailable);
     vi.mocked(fakeHasher.verify).mockClear();
     vi.mocked(fakeHasher.hash).mockClear();
-    await expect(s.signIn.execute(new SignInCommand(ada))).rejects.toBe(unavailable);
-    await expect(s.signUp.execute(new SignUpCommand({ ...ada, email: "other@example.com" }))).rejects.toBe(unavailable);
+    await expect(s.signIn.execute(ada)).rejects.toBe(unavailable);
+    await expect(s.signUp.execute({ ...ada, email: "other@example.com" })).rejects.toBe(unavailable);
     expect(fakeHasher.verify).not.toHaveBeenCalled();
     expect(fakeHasher.hash).not.toHaveBeenCalled();
   });
@@ -223,11 +223,11 @@ describe("sign-up / sign-in", () => {
     const s = setup();
     const failure = new Error("connection terminated");
     vi.spyOn(s.users, "findOne").mockRejectedValueOnce(failure);
-    await expect(s.signIn.execute(new SignInCommand(ada))).rejects.toBe(failure);
+    await expect(s.signIn.execute(ada)).rejects.toBe(failure);
   });
 
   test("current user: a deleted user throws SessionUserMissingError", async () => {
-    await expect(setup().me.execute(new GetCurrentUserQuery("usr_deleted"))).rejects.toMatchObject({
+    await expect(setup().me.execute({ userId: "usr_deleted" })).rejects.toMatchObject({
       _tag: "SessionUserMissingError",
       userId: "usr_deleted",
     });
@@ -237,7 +237,7 @@ describe("sign-up / sign-in", () => {
 describe("sessions", () => {
   test("tampered, unknown and malformed tokens are rejected", async () => {
     const s = setup();
-    const { token } = await s.signUp.execute(new SignUpCommand(ada));
+    const { token } = await s.signUp.execute(ada);
     const [id] = token.split(".");
     expect(await s.sessions.validate(`${id}.${"A".repeat(43)}`)).toBeNull();
     expect(await s.sessions.validate(`${"B".repeat(20)}.${token.split(".")[1]}`)).toBeNull();
@@ -245,25 +245,25 @@ describe("sessions", () => {
   });
   test("expired sessions are rejected and deleted", async () => {
     const s = setup();
-    const { token } = await s.signUp.execute(new SignUpCommand(ada));
+    const { token } = await s.signUp.execute(ada);
     expect(await s.sessions.validate(token, new Date(Date.now() + 31 * 24 * 3600_000))).toBeNull();
     expect(s.sessionRows.rows.size).toBe(0);
   });
   test("validation slides the expiry at most once per interval", async () => {
     const s = setup();
-    const { token } = await s.signUp.execute(new SignUpCommand(ada));
+    const { token } = await s.signUp.execute(ada);
     expect((await s.sessions.validate(token))?.refreshed).toBe(false);
     expect((await s.sessions.validate(token, new Date(Date.now() + 2 * 3600_000)))?.refreshed).toBe(true);
   });
   test("sign-out deletes this session; sign-out-all deletes every session of the user", async () => {
     const s = setup();
-    const up = await s.signUp.execute(new SignUpCommand(ada));
-    const other = await s.signIn.execute(new SignInCommand(ada));
+    const up = await s.signUp.execute(ada);
+    const other = await s.signIn.execute(ada);
     const first = await s.sessions.validate(up.token);
-    await s.signOut.execute(new SignOutCommand({ sessionId: first!.session.id.value }));
+    await s.signOut.execute({ sessionId: first!.session.id.value });
     expect(await s.sessions.validate(up.token)).toBeNull();
     expect(await s.sessions.validate(other.token)).not.toBeNull();
-    await s.signOutAll.execute(new SignOutAllCommand({ userId: up.user.id }));
+    await s.signOutAll.execute({ userId: up.user.id });
     expect(await s.sessions.validate(other.token)).toBeNull();
   });
 });
@@ -271,15 +271,13 @@ describe("sessions", () => {
 describe("roles", () => {
   test("assignRole takes effect on the next validation", async () => {
     const s = setup();
-    const { token, user } = await s.signUp.execute(new SignUpCommand(ada));
-    expect((await s.me.execute(new GetCurrentUserQuery(user.id))).permissions).toEqual({ todo: ["create", "read", "complete"] });
-    await s.assignRole.execute(new AssignRoleCommand({ userId: user.id, role: "admin" }));
+    const { token, user } = await s.signUp.execute(ada);
+    expect((await s.me.execute({ userId: user.id })).permissions).toEqual({ todo: ["create", "read", "complete"] });
+    await s.assignRole.execute({ userId: user.id, role: "admin" });
     expect((await s.sessions.validate(token))?.user.role.value).toBe("admin");
-    expect((await s.me.execute(new GetCurrentUserQuery(user.id))).permissions.user).toEqual(["list", "assignRole"]);
+    expect((await s.me.execute({ userId: user.id })).permissions.user).toEqual(["list", "assignRole"]);
   });
   test("unknown user -> NotFoundException", async () => {
-    await expect(setup().assignRole.execute(new AssignRoleCommand({ userId: "usr_missing", role: "admin" }))).rejects.toThrow(
-      NotFoundException,
-    );
+    await expect(setup().assignRole.execute({ userId: "usr_missing", role: "admin" })).rejects.toThrow(NotFoundException);
   });
 });

@@ -56,9 +56,6 @@ importers:
       '@app/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@app/cqrs':
-        specifier: workspace:*
-        version: link:../../packages/cqrs
       '@app/di':
         specifier: workspace:*
         version: link:../../packages/di
@@ -120,9 +117,6 @@ importers:
       '@app/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@app/cqrs':
-        specifier: workspace:*
-        version: link:../../packages/cqrs
       '@app/di':
         specifier: workspace:*
         version: link:../../packages/di
@@ -224,9 +218,6 @@ importers:
       '@app/core':
         specifier: workspace:*
         version: link:../core
-      '@app/cqrs':
-        specifier: workspace:*
-        version: link:../cqrs
       '@app/di':
         specifier: workspace:*
         version: link:../di
@@ -243,11 +234,11 @@ importers:
         specifier: workspace:*
         version: link:../zod
       '@millstream/core':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: ^0.4.0
+        version: 0.4.0
       '@millstream/cqrs':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: ^0.4.0
+        version: 0.4.0
     devDependencies:
       '@app/typescript-config':
         specifier: workspace:*
@@ -383,8 +374,8 @@ importers:
   packages/core:
     dependencies:
       '@millstream/cqrs':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: ^0.4.0
+        version: 0.4.0
       nanoid:
         specifier: ^5.1.11
         version: 5.1.16
@@ -395,37 +386,6 @@ importers:
       '@types/node':
         specifier: ^24.10.0
         version: 24.19.2
-
-  packages/cqrs:
-    dependencies:
-      '@app/core':
-        specifier: workspace:*
-        version: link:../core
-      '@app/di':
-        specifier: workspace:*
-        version: link:../di
-      '@app/domain':
-        specifier: workspace:*
-        version: link:../domain
-      '@app/logger':
-        specifier: workspace:*
-        version: link:../logger
-      reflect-metadata:
-        specifier: ^0.2.2
-        version: 0.2.2
-      rxjs:
-        specifier: ^7.8.2
-        version: 7.8.2
-    devDependencies:
-      '@app/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@types/node':
-        specifier: ^24.10.0
-        version: 24.19.2
-      type-fest:
-        specifier: ^5.6.0
-        version: 5.10.0
 
   packages/di:
     dependencies:
@@ -452,8 +412,8 @@ importers:
         specifier: workspace:*
         version: link:../zod
       '@millstream/cqrs':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: ^0.4.0
+        version: 0.4.0
     devDependencies:
       '@app/typescript-config':
         specifier: workspace:*
@@ -518,17 +478,17 @@ importers:
         specifier: workspace:*
         version: link:../logger
       '@millstream/core':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: ^0.4.0
+        version: 0.4.0
       '@millstream/cqrs':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: ^0.4.0
+        version: 0.4.0
       '@millstream/forwarder':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: ^0.4.0
+        version: 0.4.0
       '@millstream/pg':
-        specifier: ^0.3.0
-        version: 0.3.0(kysely@0.28.18)(postgres@3.4.9)
+        specifier: ^0.4.0
+        version: 0.4.0(kysely@0.28.18)(postgres@3.4.9)
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.4(@electric-sql/pglite@0.4.6)(kysely@0.28.18)(postgres@3.4.9)
@@ -582,20 +542,20 @@ importers:
         specifier: workspace:*
         version: link:../redis
       '@millstream/bullmq':
-        specifier: ^0.3.0
-        version: 0.3.0(bullmq@5.81.5)
+        specifier: ^0.4.0
+        version: 0.4.0(bullmq@5.81.5)
       '@millstream/core':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: ^0.4.0
+        version: 0.4.0
       '@millstream/cqrs':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: ^0.4.0
+        version: 0.4.0
       '@millstream/forwarder':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: ^0.4.0
+        version: 0.4.0
       '@millstream/pg':
-        specifier: ^0.3.0
-        version: 0.3.0(kysely@0.28.18)(postgres@3.4.9)
+        specifier: ^0.4.0
+        version: 0.4.0(kysely@0.28.18)(postgres@3.4.9)
       bullmq:
         specifier: ^5.81.5
         version: 5.81.5
@@ -677,9 +637,6 @@ importers:
       '@app/core':
         specifier: workspace:*
         version: link:../core
-      '@app/cqrs':
-        specifier: workspace:*
-        version: link:../cqrs
       '@app/di':
         specifier: workspace:*
         version: link:../di
@@ -1406,26 +1363,26 @@ packages:
   '@keyv/serialize@1.1.1':
     resolution: {integrity: sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA==}
 
-  '@millstream/bullmq@0.3.0':
-    resolution: {integrity: sha512-JCaogl23XSW9iyXB7xCoKPCW9oOXUiKxqBLg4i9UDbuiIoZ5d53psbpsIBnahMs2YQBi0l7PkEKNLiHTqTODbw==}
+  '@millstream/bullmq@0.4.0':
+    resolution: {integrity: sha512-IKdGj9yTUMwPH2+VsFCdA44wMbXiovCiI/PkR/ijKyQUqQSGYT38xK3hrcuj6q/6R4l2cAVrU1WbX9rfJQuAIQ==}
     engines: {node: '>=22'}
     peerDependencies:
       bullmq: ^5.0.0
 
-  '@millstream/core@0.3.0':
-    resolution: {integrity: sha512-4K81bXgibIOTh7/LuIv3d8x6NDVjZnfRfBHhPI8/xEv66JtCzqwTyMq85KQSdp3ONJoGdI4ZI+xg/2x4Ed2fEQ==}
+  '@millstream/core@0.4.0':
+    resolution: {integrity: sha512-+HxB1sROvzAF9w/yAnz3hDDXGT9RXqUecblHXSueFG6pJOpTOslkd6ofoynTMLpTgI+bYoPCOOuWjEq1p4Tjtw==}
     engines: {node: '>=22'}
 
-  '@millstream/cqrs@0.3.0':
-    resolution: {integrity: sha512-V2H+iUT6kCkZhOK9JGpquxdma6GNQ0eYi3wvtNPq6D2EFuf2U6kCGNeByl7yw5qpLl19pERx9Lcxr44V0u+quw==}
+  '@millstream/cqrs@0.4.0':
+    resolution: {integrity: sha512-bl5ADYgVJwjKfNYdtbN/NC08s3TKwpVLUgWuVUS5EANzrdnHBfe/Zf7FmWLUshZpvDsGfPVgxsqPZ+fiARHRyA==}
     engines: {node: '>=22'}
 
-  '@millstream/forwarder@0.3.0':
-    resolution: {integrity: sha512-X2IiaGOLATgJgPt3XDokVnc90l9aL30yqwJC8T34UzTB5WH9WPnWy9DbIs/5s4Z8qDDmesrP7Y8k4hZSgNUCoA==}
+  '@millstream/forwarder@0.4.0':
+    resolution: {integrity: sha512-g3cIecw1b9iAU09DA2LlfbfEyGvQ4ugXn2L+hCVS9IvfRt/S5ENiLcBN4a9gcT04PwqGEh4RN8dT/9uFv36EvA==}
     engines: {node: '>=22'}
 
-  '@millstream/pg@0.3.0':
-    resolution: {integrity: sha512-MDE0ST0yfPUmrTCK3OrS+KCICDrbPCRhfTLrs+LhaMgLj89oR0v+/E9DlXMnCd+PtyNa52UVsWskLC1viEQ+hg==}
+  '@millstream/pg@0.4.0':
+    resolution: {integrity: sha512-cOUvMjcbBV1N9PL6u8eDpoO7EcJ2RuUbrQvcrOc/Q58SegaqjHrrHuftZNqvaxiG/7y4nmzOAFOwvvYdzM9FxQ==}
     engines: {node: '>=22'}
     peerDependencies:
       kysely: '>=0.27.0'
@@ -3217,9 +3174,6 @@ packages:
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
 
-  rxjs@7.8.2:
-    resolution: {integrity: sha512-dhKf903U/PQZY6boNNtAGdWbG85WAbjT/1xYoZIC7FAY0yWapOBQVsVrDl58W86//e1VpMNBtRV4MaXfdMySFA==}
-
   safe-buffer@5.2.1:
     resolution: {integrity: sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==}
 
@@ -3976,24 +3930,24 @@ snapshots:
 
   '@keyv/serialize@1.1.1': {}
 
-  '@millstream/bullmq@0.3.0(bullmq@5.81.5)':
+  '@millstream/bullmq@0.4.0(bullmq@5.81.5)':
     dependencies:
-      '@millstream/core': 0.3.0
+      '@millstream/core': 0.4.0
       bullmq: 5.81.5
 
-  '@millstream/core@0.3.0': {}
+  '@millstream/core@0.4.0': {}
 
-  '@millstream/cqrs@0.3.0':
+  '@millstream/cqrs@0.4.0':
     dependencies:
-      '@millstream/core': 0.3.0
+      '@millstream/core': 0.4.0
 
-  '@millstream/forwarder@0.3.0':
+  '@millstream/forwarder@0.4.0':
     dependencies:
-      '@millstream/core': 0.3.0
+      '@millstream/core': 0.4.0
 
-  '@millstream/pg@0.3.0(kysely@0.28.18)(postgres@3.4.9)':
+  '@millstream/pg@0.4.0(kysely@0.28.18)(postgres@3.4.9)':
     dependencies:
-      '@millstream/core': 0.3.0
+      '@millstream/core': 0.4.0
     optionalDependencies:
       kysely: 0.28.18
       postgres: 3.4.9
@@ -5376,10 +5330,6 @@ snapshots:
       '@rollup/rollup-win32-x64-gnu': 4.64.9
       '@rollup/rollup-win32-x64-msvc': 4.64.9
       fsevents: 2.3.3
-
-  rxjs@7.8.2:
-    dependencies:
-      tslib: 2.8.1
 
   safe-buffer@5.2.1: {}
 

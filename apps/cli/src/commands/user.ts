@@ -1,5 +1,4 @@
-import { AssignRoleCommand, type IUserDTO, type IUserRepository, USER_REPO } from "@app/application";
-import { CommandBus } from "@app/cqrs";
+import { AssignRoleCommand, type IUserRepository, MEDIATOR, type Mediator, USER_REPO } from "@app/application";
 import { NotFoundException } from "@app/domain";
 import { UserEmail, UserEmailSpecification, UserRole } from "@app/domain";
 import { Command, Option } from "clipanion";
@@ -25,8 +24,8 @@ export class UserRoleCliCommand extends AppCommand {
     const user = await users.findOne(new UserEmailSpecification(email));
     if (!user) throw new NotFoundException("No account with this email; sign up first");
 
-    const bus = await this.context.services.resolve(CommandBus);
-    const result = await bus.execute<AssignRoleCommand, IUserDTO>(new AssignRoleCommand({ userId: user.id.value, role: role.value }));
+    const mediator = await this.context.services.resolve<Mediator>(MEDIATOR);
+    const result = await mediator.execute(AssignRoleCommand, { userId: user.id.value, role: role.value });
     this.write(result);
     return 0;
   }

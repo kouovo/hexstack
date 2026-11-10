@@ -13,7 +13,7 @@
   "dependencies": {
     "@app/core": "workspace:*",
     "@app/zod": "workspace:*",
-    "@millstream/cqrs": "^0.3.0"
+    "@millstream/cqrs": "^0.4.0"
   },
   "devDependencies": {
     "@app/typescript-config": "workspace:*",

@@ -17,7 +17,6 @@
     "@app/application": "workspace:*",
     "@app/bootstrap": "workspace:*",
     "@app/core": "workspace:*",
-    "@app/cqrs": "workspace:*",
     "@app/di": "workspace:*",
     "@app/domain": "workspace:*",
     "@app/persistence": "workspace:*",

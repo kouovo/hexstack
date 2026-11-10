@@ -1,22 +1,16 @@
-import { Command, commandHandler, type ICommandHandler } from "@app/cqrs";
 import { singleton } from "@app/di";
-import { UserId } from "@app/domain";
+import { UserId, userIdSchema } from "@app/domain";
+import { z } from "@app/zod";
 
+import { defineCommand, type IRequestHandler, type RequestPayload } from "../../shared/mediator";
 import { type SessionService, injectSessionService } from "../session.service";
 
 /** Sign out this device: the session row is deleted, not just the cookie. */
-export class SignOutCommand extends Command {
-  public readonly sessionId: string;
+export const SignOutCommand = defineCommand("auth.sign-out", z.object({ sessionId: z.string().min(1) }));
+export type SignOutCommand = RequestPayload<typeof SignOutCommand>;
 
-  constructor(props: { sessionId: string }) {
-    super(props);
-    this.sessionId = props.sessionId;
-  }
-}
-
-@commandHandler(SignOutCommand)
 @singleton()
-export class SignOutCommandHandler implements ICommandHandler<SignOutCommand, void> {
+export class SignOutCommandHandler implements IRequestHandler<typeof SignOutCommand> {
   constructor(@injectSessionService() private readonly sessions: SessionService) {}
 
   async execute(command: SignOutCommand): Promise<void> {
@@ -25,18 +19,11 @@ export class SignOutCommandHandler implements ICommandHandler<SignOutCommand, vo
 }
 
 /** Sign out every device, e.g. after a lost laptop. */
-export class SignOutAllCommand extends Command {
-  public readonly userId: string;
+export const SignOutAllCommand = defineCommand("auth.sign-out-all", z.object({ userId: userIdSchema }));
+export type SignOutAllCommand = RequestPayload<typeof SignOutAllCommand>;
 
-  constructor(props: { userId: string }) {
-    super(props);
-    this.userId = props.userId;
-  }
-}
-
-@commandHandler(SignOutAllCommand)
 @singleton()
-export class SignOutAllCommandHandler implements ICommandHandler<SignOutAllCommand, void> {
+export class SignOutAllCommandHandler implements IRequestHandler<typeof SignOutAllCommand> {
   constructor(@injectSessionService() private readonly sessions: SessionService) {}
 
   async execute(command: SignOutAllCommand): Promise<void> {

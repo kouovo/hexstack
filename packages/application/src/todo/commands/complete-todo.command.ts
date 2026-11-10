@@ -1,9 +1,9 @@
-import { Command, commandHandler, type ICommandHandler } from "@app/cqrs";
 import { singleton } from "@app/di";
 import { TodoId, TodoIdSpecification, todoIdSchema, TodoModifiedConcurrentlyError, TodoNotFoundError } from "@app/domain";
 import { z } from "@app/zod";
 
 import { type DomainEventScope, injectDomainEventScope } from "../../shared/domain-event-scope";
+import { defineCommand, type IRequestHandler, type RequestPayload } from "../../shared/mediator";
 import type { ITodoDTO } from "../todo.dto";
 import { TodoMapper } from "../todo.mapper";
 import { type ITodoRepository, injectTodoRepo } from "../todo.repository.port";
@@ -14,19 +14,12 @@ export const completeTodoCommand = z.object({
 
 export type ICompleteTodoCommand = z.infer<typeof completeTodoCommand>;
 
-export class CompleteTodoCommand extends Command implements ICompleteTodoCommand {
-  public readonly todoId: string;
-
-  constructor(props: ICompleteTodoCommand) {
-    super(props);
-    this.todoId = props.todoId;
-  }
-}
+export const CompleteTodoCommand = defineCommand("todo.complete", completeTodoCommand).returns<ITodoDTO>();
+export type CompleteTodoCommand = RequestPayload<typeof CompleteTodoCommand>;
 
 /** open -> completed. Thrown domain errors roll back the transaction. */
-@commandHandler(CompleteTodoCommand)
 @singleton()
-export class CompleteTodoCommandHandler implements ICommandHandler<CompleteTodoCommand, ITodoDTO> {
+export class CompleteTodoCommandHandler implements IRequestHandler<typeof CompleteTodoCommand> {
   constructor(
     @injectTodoRepo() private readonly todoRepo: ITodoRepository,
     @injectDomainEventScope() private readonly events: DomainEventScope,

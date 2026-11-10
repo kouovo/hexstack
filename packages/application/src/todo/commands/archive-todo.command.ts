@@ -1,9 +1,9 @@
-import { Command, commandHandler, type ICommandHandler } from "@app/cqrs";
 import { singleton } from "@app/di";
 import { TodoId, TodoIdSpecification, todoIdSchema, TodoModifiedConcurrentlyError, TodoNotFoundError } from "@app/domain";
 import { z } from "@app/zod";
 
 import { type DomainEventScope, injectDomainEventScope } from "../../shared/domain-event-scope";
+import { defineCommand, type IRequestHandler, type RequestPayload } from "../../shared/mediator";
 import type { ITodoDTO } from "../todo.dto";
 import { TodoMapper } from "../todo.mapper";
 import { type ITodoRepository, injectTodoRepo } from "../todo.repository.port";
@@ -14,19 +14,12 @@ export const archiveTodoCommand = z.object({
 
 export type IArchiveTodoCommand = z.infer<typeof archiveTodoCommand>;
 
-export class ArchiveTodoCommand extends Command implements IArchiveTodoCommand {
-  public readonly todoId: string;
-
-  constructor(props: IArchiveTodoCommand) {
-    super(props);
-    this.todoId = props.todoId;
-  }
-}
+export const ArchiveTodoCommand = defineCommand("todo.archive", archiveTodoCommand).returns<ITodoDTO>();
+export type ArchiveTodoCommand = RequestPayload<typeof ArchiveTodoCommand>;
 
 /** open|completed -> archived. Thrown domain errors roll back the transaction. */
-@commandHandler(ArchiveTodoCommand)
 @singleton()
-export class ArchiveTodoCommandHandler implements ICommandHandler<ArchiveTodoCommand, ITodoDTO> {
+export class ArchiveTodoCommandHandler implements IRequestHandler<typeof ArchiveTodoCommand> {
   constructor(
     @injectTodoRepo() private readonly todoRepo: ITodoRepository,
     @injectDomainEventScope() private readonly events: DomainEventScope,

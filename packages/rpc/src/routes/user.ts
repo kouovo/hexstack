@@ -1,20 +1,18 @@
-import { AssignRoleCommand, assignRoleCommand, type IUserDTO, ListUsersQuery, listUsersQuery } from "@app/application";
-import { CommandBus, QueryBus } from "@app/cqrs";
+import { AssignRoleCommand, assignRoleCommand, ListUsersQuery, listUsersQuery, MEDIATOR, type Mediator } from "@app/application";
 import { container } from "@app/di";
 
 import { rpcMutation, rpcQuery } from "../procedure";
 
-const commandBus = () => container.resolve(CommandBus);
-const queryBus = () => container.resolve(QueryBus);
+const mediator = () => container.resolve<Mediator>(MEDIATOR);
 
 const list = rpcQuery
   .meta({ permissions: { user: ["list"] } })
   .input(listUsersQuery.partial().optional())
-  .handler(({ input }) => queryBus().execute<IUserDTO[]>(new ListUsersQuery(input ?? {})));
+  .handler(({ input }) => mediator().query(ListUsersQuery, input ?? {}));
 
 const assignRole = rpcMutation
   .meta({ permissions: { user: ["assignRole"] } })
   .input(assignRoleCommand)
-  .handler(({ input }) => commandBus().execute<AssignRoleCommand, IUserDTO>(new AssignRoleCommand(input)));
+  .handler(({ input }) => mediator().execute(AssignRoleCommand, input));
 
 export const userRouter = { list, assignRole };

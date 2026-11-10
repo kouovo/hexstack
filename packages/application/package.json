@@ -12,14 +12,13 @@
   },
   "dependencies": {
     "@app/core": "workspace:*",
-    "@app/cqrs": "workspace:*",
     "@app/di": "workspace:*",
     "@app/domain": "workspace:*",
     "@app/env": "workspace:*",
     "@app/logger": "workspace:*",
     "@app/zod": "workspace:*",
-    "@millstream/core": "^0.3.0",
-    "@millstream/cqrs": "^0.3.0"
+    "@millstream/core": "^0.4.0",
+    "@millstream/cqrs": "^0.4.0"
   },
   "devDependencies": {
     "@app/typescript-config": "workspace:*",

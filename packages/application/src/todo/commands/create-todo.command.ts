@@ -1,9 +1,9 @@
-import { Command, commandHandler, type ICommandHandler } from "@app/cqrs";
 import { singleton } from "@app/di";
 import { TodoEntity, TodoTitle, TodoTitleSpecification, todoTitleSchema } from "@app/domain";
 import { z } from "@app/zod";
 
 import { type DomainEventScope, injectDomainEventScope } from "../../shared/domain-event-scope";
+import { defineCommand, type IRequestHandler, type RequestPayload } from "../../shared/mediator";
 import type { ITodoDTO } from "../todo.dto";
 import { TodoMapper } from "../todo.mapper";
 import { type ITodoRepository, injectTodoRepo } from "../todo.repository.port";
@@ -14,18 +14,11 @@ export const createTodoCommand = z.object({
 
 export type ICreateTodoCommand = z.infer<typeof createTodoCommand>;
 
-export class CreateTodoCommand extends Command implements ICreateTodoCommand {
-  public readonly title: string;
+export const CreateTodoCommand = defineCommand("todo.create", createTodoCommand).returns<ITodoDTO>();
+export type CreateTodoCommand = RequestPayload<typeof CreateTodoCommand>;
 
-  constructor(props: ICreateTodoCommand) {
-    super(props);
-    this.title = props.title;
-  }
-}
-
-@commandHandler(CreateTodoCommand)
 @singleton()
-export class CreateTodoCommandHandler implements ICommandHandler<CreateTodoCommand, ITodoDTO> {
+export class CreateTodoCommandHandler implements IRequestHandler<typeof CreateTodoCommand> {
   constructor(
     @injectTodoRepo() private readonly todoRepo: ITodoRepository,
     @injectDomainEventScope() private readonly events: DomainEventScope,
