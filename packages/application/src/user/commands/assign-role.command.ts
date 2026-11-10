@@ -5,7 +5,7 @@ import { z } from "@app/zod";
 import { type DomainEventScope, injectDomainEventScope } from "../../shared/domain-event-scope";
 import { defineCommand, type IRequestHandler, type RequestPayload } from "../../shared/mediator";
 import type { IUserDTO } from "../user.dto";
-import { UserMapper } from "../user.mapper";
+import { toUserDTO } from "../user.mapper";
 import { type IUserRepository, injectUserRepo } from "../user.repository.port";
 
 export const assignRoleCommand = z.object({
@@ -34,6 +34,6 @@ export class AssignRoleCommandHandler implements IRequestHandler<typeof AssignRo
       track(user);
       return user;
     });
-    return UserMapper.toResponse(user);
+    return toUserDTO(user);
   }
 }

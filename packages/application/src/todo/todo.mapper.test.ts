@@ -1,7 +1,7 @@
 import { TodoEntity, TodoTitle, TodoTitleSpecification } from "@app/domain";
 import { expect, test } from "vitest";
 
-import { TodoMapper } from "./todo.mapper";
+import { toTodoDTO, toTodoEntity, toTodoRecord } from "./todo.mapper";
 
 const at = new Date("2024-01-01T00:00:00.000Z");
 function completedTodo() {
@@ -10,9 +10,9 @@ function completedTodo() {
   return todo;
 }
 
-test("toPersistence -> toEntity round-trips every field", () => {
+test("toTodoRecord -> toTodoEntity round-trips every field", () => {
   const todo = completedTodo();
-  const record = TodoMapper.toPersistence(todo);
+  const record = toTodoRecord(todo);
   expect(record).toEqual({
     id: todo.id.value,
     title: "map me",
@@ -22,18 +22,18 @@ test("toPersistence -> toEntity round-trips every field", () => {
     created_at: at,
     updated_at: at,
   });
-  expect(TodoMapper.toPersistence(TodoMapper.toEntity(record))).toEqual(record);
+  expect(toTodoRecord(toTodoEntity(record))).toEqual(record);
 });
 
-test("toEntity accepts string timestamps from the driver", () => {
-  const record = TodoMapper.toPersistence(completedTodo());
-  const entity = TodoMapper.toEntity({ ...record, created_at: at.toISOString() as unknown as Date });
+test("toTodoEntity accepts string timestamps from the driver", () => {
+  const record = toTodoRecord(completedTodo());
+  const entity = toTodoEntity({ ...record, created_at: at.toISOString() as unknown as Date });
   expect(entity.createdAt).toEqual(at);
 });
 
-test("toResponse produces a serialisable DTO", () => {
+test("toTodoDTO produces a serialisable DTO", () => {
   const todo = completedTodo();
-  expect(TodoMapper.toResponse(todo)).toEqual({
+  expect(toTodoDTO(todo)).toEqual({
     id: todo.id.value,
     title: "map me",
     status: "completed",

@@ -15,7 +15,7 @@ import { defineQuery, type IRequestHandler, type RequestPayload } from "../../sh
 import { TODO_LIST_CACHE_NAMESPACE } from "../todo-cache-invalidation";
 import { todoListQueryKey } from "../todo-list-cache-key";
 import type { ITodoDTO } from "../todo.dto";
-import { TodoMapper } from "../todo.mapper";
+import { toTodoDTO } from "../todo.mapper";
 import { type ITodoRepository, injectTodoRepo } from "../todo.repository.port";
 
 export const listTodosQuery = z.object({
@@ -47,7 +47,7 @@ export class ListTodosQueryHandler implements IRequestHandler<typeof ListTodosQu
           .add(query.status, TodoStatus.create, TodoStatusSpecification)
           .build();
         const todos = await this.todoRepo.find(spec, { limit: query.limit });
-        return todos.map((todo) => TodoMapper.toResponse(todo));
+        return todos.map(toTodoDTO);
       },
       jitteredTtlSeconds(ListTodosQueryHandler.TODO_LIST_TTL_SECONDS),
       // `lock` single-flights concurrent misses across replicas, so a version bump cannot stampede the database.

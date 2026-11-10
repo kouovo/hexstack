@@ -5,7 +5,7 @@ import {
   NotifyTodoCompletedJobHandler,
   DomainEventScope,
   type DomainEventPublisher,
-  TodoMapper,
+  toTodoRecord,
 } from "@app/application";
 import { DomainError } from "@app/core";
 import {
@@ -86,13 +86,13 @@ test("round-trips an entity through the table", async () => {
   expect(await repo.find(undefined, { limit: 10 })).toHaveLength(1);
 });
 
-test("toPersistence -> SQL -> toEntity round-trips every column", async () => {
+test("toTodoRecord -> SQL -> toTodoEntity round-trips every column", async () => {
   const at = new Date("2024-01-01T00:00:00.000Z");
   const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create("columns")), at);
   todo.complete(at);
   await repo.insert(todo);
   const loaded = await repo.findOne(new TodoIdSpecification(todo.id));
-  expect(TodoMapper.toPersistence(loaded!)).toEqual(TodoMapper.toPersistence(todo));
+  expect(toTodoRecord(loaded!)).toEqual(toTodoRecord(todo));
 });
 
 test("specifications are translated to SQL, including and / or / not", async () => {

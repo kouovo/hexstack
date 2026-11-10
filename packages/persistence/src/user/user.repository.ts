@@ -1,4 +1,4 @@
-import { type IUserRepository, UserMapper } from "@app/application";
+import { type IUserRepository, toUserEntity, toUserRecord } from "@app/application";
 import { singleton } from "@app/di";
 import { EmailAlreadyRegisteredError, type UserEntity, type UserSpecification } from "@app/domain";
 
@@ -19,7 +19,7 @@ export class UserRepository implements IUserRepository {
       .selectAll()
       .where((eb) => new UserQueryVisitor(eb).$where(spec))
       .executeTakeFirst();
-    return row ? UserMapper.toEntity(row) : undefined;
+    return row ? toUserEntity(row) : undefined;
   }
 
   async find(spec: UserSpecification | undefined, { limit }: { limit: number }): Promise<UserEntity[]> {
@@ -32,12 +32,12 @@ export class UserRepository implements IUserRepository {
       .orderBy("id", "asc")
       .limit(limit)
       .execute();
-    return rows.map((row) => UserMapper.toEntity(row));
+    return rows.map(toUserEntity);
   }
 
   async insert(user: UserEntity): Promise<void> {
     try {
-      await this.transactions.getExecutor().insertInto(USER_TABLE).values(UserMapper.toPersistence(user)).execute();
+      await this.transactions.getExecutor().insertInto(USER_TABLE).values(toUserRecord(user)).execute();
     } catch (cause) {
       // Only translate the expected unique violation; preserve unexpected errors unchanged.
       if ((cause as { code?: string } | null)?.code === UNIQUE_VIOLATION) {
@@ -48,7 +48,7 @@ export class UserRepository implements IUserRepository {
   }
 
   async update(user: UserEntity): Promise<void> {
-    const values = UserMapper.toPersistence(user);
+    const values = toUserRecord(user);
     await this.transactions
       .getExecutor()
       .updateTable(USER_TABLE)

@@ -1,4 +1,4 @@
-import { type FindTodosOptions, type ITodoRepository, TodoMapper } from "@app/application";
+import { type FindTodosOptions, type ITodoRepository, toTodoEntity, toTodoRecord } from "@app/application";
 import { singleton } from "@app/di";
 import type { TodoEntity, TodoId, TodoSpecification, TodoStatusValue } from "@app/domain";
 
@@ -18,7 +18,7 @@ export class TodoRepository implements ITodoRepository {
       .selectAll()
       .where((eb) => new TodoQueryVisitor(eb).$where(spec))
       .executeTakeFirst();
-    return row ? TodoMapper.toEntity(row) : undefined;
+    return row ? toTodoEntity(row) : undefined;
   }
 
   async find(spec: TodoSpecification | undefined, { limit }: FindTodosOptions): Promise<TodoEntity[]> {
@@ -31,15 +31,15 @@ export class TodoRepository implements ITodoRepository {
       .orderBy("id", "desc")
       .limit(limit)
       .execute();
-    return rows.map((row) => TodoMapper.toEntity(row));
+    return rows.map(toTodoEntity);
   }
 
   async insert(todo: TodoEntity): Promise<void> {
-    await this.transactions.getExecutor().insertInto(TODO_TABLE).values(TodoMapper.toPersistence(todo)).execute();
+    await this.transactions.getExecutor().insertInto(TODO_TABLE).values(toTodoRecord(todo)).execute();
   }
 
   async updateIfStatus(todo: TodoEntity, expected: TodoStatusValue): Promise<boolean> {
-    const values = TodoMapper.toPersistence(todo);
+    const values = toTodoRecord(todo);
     const result = await this.transactions
       .getExecutor()
       .updateTable(TODO_TABLE)

@@ -5,7 +5,7 @@ import { z } from "@app/zod";
 import { type DomainEventScope, injectDomainEventScope } from "../../shared/domain-event-scope";
 import { defineCommand, type IRequestHandler, type RequestPayload } from "../../shared/mediator";
 import type { ITodoDTO } from "../todo.dto";
-import { TodoMapper } from "../todo.mapper";
+import { toTodoDTO } from "../todo.mapper";
 import { type ITodoRepository, injectTodoRepo } from "../todo.repository.port";
 
 export const archiveTodoCommand = z.object({
@@ -42,6 +42,6 @@ export class ArchiveTodoCommandHandler implements IRequestHandler<typeof Archive
       track(todo);
       return todo;
     });
-    return TodoMapper.toResponse(changed);
+    return toTodoDTO(changed);
   }
 }

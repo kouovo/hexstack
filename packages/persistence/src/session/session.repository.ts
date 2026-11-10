@@ -1,4 +1,4 @@
-import { type ISessionRepository, SessionMapper } from "@app/application";
+import { type ISessionRepository, toSessionEntity, toSessionRecord } from "@app/application";
 import { singleton } from "@app/di";
 import type { SessionEntity, UserId } from "@app/domain";
 
@@ -11,11 +11,11 @@ export class SessionRepository implements ISessionRepository {
 
   async findById(id: string): Promise<SessionEntity | undefined> {
     const row = await this.transactions.getExecutor().selectFrom(SESSION_TABLE).selectAll().where("id", "=", id).executeTakeFirst();
-    return row ? SessionMapper.toEntity(row) : undefined;
+    return row ? toSessionEntity(row) : undefined;
   }
 
   async insert(session: SessionEntity): Promise<void> {
-    await this.transactions.getExecutor().insertInto(SESSION_TABLE).values(SessionMapper.toPersistence(session)).execute();
+    await this.transactions.getExecutor().insertInto(SESSION_TABLE).values(toSessionRecord(session)).execute();
   }
 
   async update(session: SessionEntity): Promise<void> {
