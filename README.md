@@ -194,7 +194,7 @@ just to fill an architectural diagram.
 
 ### Dependency direction
 
-Arrows below mean **imports/dependencies**, not execution order. Supporting libraries such as `core`, `cqrs`, `di`,
+Arrows below mean **imports/dependencies**, not execution order. Supporting libraries such as `core`, `di`,
 and `zod` are omitted for clarity.
 
 ```mermaid
@@ -256,7 +256,6 @@ packages/
   rpc/                  oRPC routes, protected procedures, error mapping, typed client
   bootstrap/            registerDI(): infrastructure bindings and handler registration
   core/                 entity/event/specification primitives, value objects, exceptions, ids
-  cqrs/                 command and query buses
   context/              AsyncLocalStorage: request id, client address, principal
   di/  zod/  logger/     small shared-library wrappers
   env/                  validated runtime environment
@@ -290,7 +289,7 @@ The core consists of two kinds of responsibility:
 | **Domain**      | Meaningful values, allowed transitions, entity behavior, facts that happened                    | HTTP routes, cookies, SQL queries, queue clients             |
 | **Application** | Use-case sequencing, ports, transaction boundaries, response mapping, side-effect orchestration | Hono/Next handlers or concrete Postgres/Redis/BullMQ clients |
 
-The core is not literally dependency-free. It uses shared primitives, CQRS/DI decorators, and Zod; application session
+The core is not literally dependency-free. It uses shared primitives, DI decorators, millstream definitions, and Zod; application session
 token generation also uses Node's crypto API. Domain factories generate ids/timestamps, with explicit dates accepted
 where needed for tests. Those are pragmatic dependencies, not a claim of completely pure or universally portable code.
 
@@ -321,16 +320,21 @@ the transaction, then inserts the user and starts its session atomically.
 
 - A **command** expresses intent to change state: `CreateTodoCommand`, `CompleteTodoCommand`, `AssignRoleCommand`.
 - A **query** asks for data: `ListTodosQuery`, `GetCurrentUserQuery`, `ListUsersQuery`.
-- `CommandBus` / `QueryBus` select the registered handler. They are not message brokers or durable queues.
+- Both are [millstream](https://github.com/kouovo/millstream) `defineCommand` / `defineQuery` definitions: an explicit
+  name, a Zod schema and a result type. The definition doubles as the payload type the handler receives.
+- A millstream `Mediator` (DI token `MEDIATOR`) calls the one registered handler in process:
+  `mediator.execute(CreateTodoCommand, input)` / `mediator.query(ListTodosQuery, input)`. It validates the input against
+  the schema (applying defaults) before the handler runs. It is not a message broker or a durable queue.
 - Commands return DTOs when useful; the template does not enforce a strict "commands return nothing" rule.
 - Business query handlers do not perform business writes. The HTTP authentication middleware may independently
   refresh/clean up a session while serving a request.
 
-Handlers are registered in [registerDomainCqrsHandlers()](packages/application/src/register.ts).
+Handlers are DI classes implementing `IRequestHandler<typeof Definition>`, bound to their definition with `bindHandler()`
+in [registerDomainCqrsHandlers()](packages/application/src/register.ts), which resolves them immediately.
 Keep infrastructure ports registered before resolving handlers that inject them.
 
 Examples: [todo commands](packages/application/src/todo/commands), [todo queries](packages/application/src/todo/queries),
-[command/query/event buses](packages/cqrs/src).
+[mediator wiring](packages/application/src/shared/mediator.ts).
 
 ### Ports
 
@@ -500,7 +504,7 @@ objects and does not fit an entity or value object.
 and a server-side `kind` from the finite `ErrorKind` union. It supplies a default `retryable = false`, native `cause`,
 and minimal `toJSON()` (`_tag` + developer message, never `kind`).
 All concrete project error classes and catalogs live in [`packages/domain/src/errors`](packages/domain/src/errors) and are
-exported exclusively from `@app/domain`. This includes use-case, adapter, configuration and CQRS errors; other
+exported exclusively from `@app/domain`. This includes use-case, adapter and configuration errors; other
 packages do not define or re-export them. Subclasses carry typed fields such as `todoId`, `from`/`to`, `rule` or `retryAfterSeconds`.
 
 - **Way in:** adapters translate only recognized failures (e.g. Postgres unique violations into
@@ -527,15 +531,16 @@ packages do not define or re-export them. Subclasses carry typed fields such as 
   intentionally idempotent (e.g. "already stopped" counts as success).
 - **Transactions:** [`DomainEventScope.run()`](packages/application/src/shared/domain-event-scope.ts) rolls back on
   any throw, appends no committed outbox rows and publishes nothing. After a successful commit, broadcast failures
-  cannot undo the write. CQRS buses preserve thrown error identity.
+  cannot undo the write. The mediator preserves thrown error identity.
 - **Trade-off:** TypeScript does not check thrown error unions at call sites. Catalogs make boundary mappings
   exhaustive, not every caller's `catch` block. There is no extra error-handling library or return-value wrapper.
 
 All concrete errors extend the same `DomainError` from `@app/core`; there is no second error base or legacy export path. Public catalogs
 and `KnownError` are defined in domain; HTTP/RPC status and response mappings remain in the transport layer.
 Core's generic identifier/state-machine helpers accept caller-supplied error factories rather than importing domain,
-avoiding a dependency cycle. Database/internal failures remain sanitized and retryable; configuration/CQRS faults
-are permanent and are not in the public catalog.
+avoiding a dependency cycle. Database/internal failures remain sanitized and retryable; configuration faults
+are permanent and are not in the public catalog. millstream's `HandlerNotFoundError` / `InvalidRequestError` are not
+`DomainError`s, so they surface as internal (500) failures; transports validate input before dispatching.
 
 Value objects use only the small `ValueObject<TState>` base in core. Concrete value objects explicitly define their
 value getters and any string/JSON representation; passwords and password hashes keep redacted representations.
@@ -734,7 +739,7 @@ Create, complete, and archive stay on oRPC; this route is only the list example.
 
 The [CLI](apps/cli/src/commands) is another primary adapter. Its role-assignment command invokes the same application
 use case from a trusted operator context. Authorization at the RPC boundary does not magically protect direct
-`CommandBus` calls; workers, CLI commands, and future transports must establish their own trust boundary.
+`Mediator` calls; workers, CLI commands, and future transports must establish their own trust boundary.
 
 ### DTOs and mappers
 
