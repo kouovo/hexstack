@@ -234,11 +234,11 @@ importers:
         specifier: workspace:*
         version: link:../zod
       '@millstream/core':
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: ^0.5.0
+        version: 0.5.0
       '@millstream/cqrs':
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: ^0.5.0
+        version: 0.5.0
     devDependencies:
       '@app/typescript-config':
         specifier: workspace:*
@@ -374,8 +374,8 @@ importers:
   packages/core:
     dependencies:
       '@millstream/cqrs':
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: ^0.5.0
+        version: 0.5.0
       nanoid:
         specifier: ^5.1.11
         version: 5.1.16
@@ -412,8 +412,8 @@ importers:
         specifier: workspace:*
         version: link:../zod
       '@millstream/cqrs':
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: ^0.5.0
+        version: 0.5.0
     devDependencies:
       '@app/typescript-config':
         specifier: workspace:*
@@ -478,17 +478,17 @@ importers:
         specifier: workspace:*
         version: link:../logger
       '@millstream/core':
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: ^0.5.0
+        version: 0.5.0
       '@millstream/cqrs':
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: ^0.5.0
+        version: 0.5.0
       '@millstream/forwarder':
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: ^0.5.0
+        version: 0.5.0
       '@millstream/pg':
-        specifier: ^0.4.0
-        version: 0.4.0(kysely@0.28.18)(postgres@3.4.9)
+        specifier: ^0.5.0
+        version: 0.5.0(kysely@0.28.18)(postgres@3.4.9)
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.4(@electric-sql/pglite@0.4.6)(kysely@0.28.18)(postgres@3.4.9)
@@ -542,20 +542,20 @@ importers:
         specifier: workspace:*
         version: link:../redis
       '@millstream/bullmq':
-        specifier: ^0.4.0
-        version: 0.4.0(bullmq@5.81.5)
+        specifier: ^0.5.0
+        version: 0.5.0(bullmq@5.81.5)
       '@millstream/core':
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: ^0.5.0
+        version: 0.5.0
       '@millstream/cqrs':
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: ^0.5.0
+        version: 0.5.0
       '@millstream/forwarder':
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: ^0.5.0
+        version: 0.5.0
       '@millstream/pg':
-        specifier: ^0.4.0
-        version: 0.4.0(kysely@0.28.18)(postgres@3.4.9)
+        specifier: ^0.5.0
+        version: 0.5.0(kysely@0.28.18)(postgres@3.4.9)
       bullmq:
         specifier: ^5.81.5
         version: 5.81.5
@@ -1363,26 +1363,26 @@ packages:
   '@keyv/serialize@1.1.1':
     resolution: {integrity: sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA==}
 
-  '@millstream/bullmq@0.4.0':
-    resolution: {integrity: sha512-IKdGj9yTUMwPH2+VsFCdA44wMbXiovCiI/PkR/ijKyQUqQSGYT38xK3hrcuj6q/6R4l2cAVrU1WbX9rfJQuAIQ==}
+  '@millstream/bullmq@0.5.0':
+    resolution: {integrity: sha512-ZZdE9r3dFF2UmvEBRhlhfxIC97rJLeqITTCr2VeckTq3jeZv8FDPMth5DyAXNOa1wtjJvBRtLi48wob2ZhvV+w==}
     engines: {node: '>=22'}
     peerDependencies:
       bullmq: ^5.0.0
 
-  '@millstream/core@0.4.0':
-    resolution: {integrity: sha512-+HxB1sROvzAF9w/yAnz3hDDXGT9RXqUecblHXSueFG6pJOpTOslkd6ofoynTMLpTgI+bYoPCOOuWjEq1p4Tjtw==}
+  '@millstream/core@0.5.0':
+    resolution: {integrity: sha512-NoafZstiUFc1epvfizJR8ymzbhr+mFDxBQLb25TK+LD1HBDT0mVFvtaOr0b8RkPeOpVTvORilL2HhGdt3RSgjQ==}
     engines: {node: '>=22'}
 
-  '@millstream/cqrs@0.4.0':
-    resolution: {integrity: sha512-bl5ADYgVJwjKfNYdtbN/NC08s3TKwpVLUgWuVUS5EANzrdnHBfe/Zf7FmWLUshZpvDsGfPVgxsqPZ+fiARHRyA==}
+  '@millstream/cqrs@0.5.0':
+    resolution: {integrity: sha512-AqcfItdyCH54oxb50KdcunKyr5S4xCIMb4YC2fgsK2cBjME8XTpHqYW3p0l8fZylJku0s0595A/FuOmNrmvH7A==}
     engines: {node: '>=22'}
 
-  '@millstream/forwarder@0.4.0':
-    resolution: {integrity: sha512-g3cIecw1b9iAU09DA2LlfbfEyGvQ4ugXn2L+hCVS9IvfRt/S5ENiLcBN4a9gcT04PwqGEh4RN8dT/9uFv36EvA==}
+  '@millstream/forwarder@0.5.0':
+    resolution: {integrity: sha512-rdlT4aEu64gx9r5sa9T7CkC/XzU81kDlR5PW/2o86vLLBkHR1MoFoI8hS+PefBUR8mWUUk8lwxEzmw7swtkTfA==}
     engines: {node: '>=22'}
 
-  '@millstream/pg@0.4.0':
-    resolution: {integrity: sha512-cOUvMjcbBV1N9PL6u8eDpoO7EcJ2RuUbrQvcrOc/Q58SegaqjHrrHuftZNqvaxiG/7y4nmzOAFOwvvYdzM9FxQ==}
+  '@millstream/pg@0.5.0':
+    resolution: {integrity: sha512-/Rm+HNAThYjrLNsn8uEeTYg/3EtsSznIqhqnpBAAZRYXbDpiSI5l/sdemVWLdR4Ucy8i7Uh09msKa/XfWfAyig==}
     engines: {node: '>=22'}
     peerDependencies:
       kysely: '>=0.27.0'
@@ -3930,24 +3930,24 @@ snapshots:
 
   '@keyv/serialize@1.1.1': {}
 
-  '@millstream/bullmq@0.4.0(bullmq@5.81.5)':
+  '@millstream/bullmq@0.5.0(bullmq@5.81.5)':
     dependencies:
-      '@millstream/core': 0.4.0
+      '@millstream/core': 0.5.0
       bullmq: 5.81.5
 
-  '@millstream/core@0.4.0': {}
+  '@millstream/core@0.5.0': {}
 
-  '@millstream/cqrs@0.4.0':
+  '@millstream/cqrs@0.5.0':
     dependencies:
-      '@millstream/core': 0.4.0
+      '@millstream/core': 0.5.0
 
-  '@millstream/forwarder@0.4.0':
+  '@millstream/forwarder@0.5.0':
     dependencies:
-      '@millstream/core': 0.4.0
+      '@millstream/core': 0.5.0
 
-  '@millstream/pg@0.4.0(kysely@0.28.18)(postgres@3.4.9)':
+  '@millstream/pg@0.5.0(kysely@0.28.18)(postgres@3.4.9)':
     dependencies:
-      '@millstream/core': 0.4.0
+      '@millstream/core': 0.5.0
     optionalDependencies:
       kysely: 0.28.18
       postgres: 3.4.9
