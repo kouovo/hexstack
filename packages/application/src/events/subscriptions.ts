@@ -6,10 +6,7 @@ import { DispatchTodoCompletedOutboxHandler } from "../todo/todo-outbox-handlers
 import { UserRoleChangedLogEventHandler } from "../user/events";
 import { type EventSubscription, subscribe } from "./subscription";
 
-/**
- * In-process, after commit, best effort (millstream MemoryPubSub + dropOnError). Every event is broadcast here.
- * Add one line per (event, handler).
- */
+/** After commit, best effort. */
 export const IN_PROCESS_EVENT_SUBSCRIPTIONS: readonly EventSubscription[] = [
   subscribe(TodoCreatedEvent, "todo.created.log", TodoCreatedLogEventHandler),
   subscribe(TodoCompletedEvent, "todo.completed.log", TodoCompletedLogEventHandler),
@@ -20,10 +17,7 @@ export const IN_PROCESS_EVENT_SUBSCRIPTIONS: readonly EventSubscription[] = [
   ),
 ];
 
-/**
- * Durable, at-least-once (outbox → BullMQ, one queue per subscription, BullMQ retries). This list also decides
- * which events are written to the outbox: exactly those with at least one durable subscription.
- */
+/** At-least-once. Only events listed here are written to the outbox. */
 export const DURABLE_EVENT_SUBSCRIPTIONS: readonly EventSubscription[] = [
   subscribe(TodoCompletedEvent, "todo.dispatch-completion-notification", DispatchTodoCompletedOutboxHandler),
 ];

@@ -13,11 +13,10 @@ export interface SessionRecord {
 export interface ISessionRepository {
   findById(id: string): Promise<SessionEntity | undefined>;
   insert(session: SessionEntity): Promise<void>;
-  /** Persists expires_at / refreshed_at after a sliding refresh. */
   update(session: SessionEntity): Promise<void>;
   delete(id: string): Promise<void>;
   deleteByUserId(userId: UserId): Promise<void>;
-  /** Housekeeping; returns how many rows were removed. */
+  /** Returns how many rows were removed. */
   deleteExpired(now: Date): Promise<number>;
 }
 

@@ -21,15 +21,11 @@ export abstract class AggregateRoot<
 > extends Entity<TEntityState, TId> {
   private readonly domainEvents: EventItem[] = [];
 
-  /**
-   * Records a domain event (a millstream `defineEvent` definition plus its payload). The event id is fixed here,
-   * so every transport (outbox, in-process bus) carries the same message uuid.
-   */
+  /** The event id is fixed here, so every transport carries the same message uuid. */
   protected addDomainEvent<E extends AnyEventDefinition>(event: E, payload: EventInput<E>): void {
     this.domainEvents.push(event.of(payload, { uuid: generateId("event") }));
   }
 
-  /** Hands the recorded events out once (DomainEventScope collects them after the use case's work). */
   clearDomainEvents(): EventItem[] {
     const events = [...this.domainEvents];
     this.domainEvents.length = 0;

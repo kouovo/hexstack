@@ -7,7 +7,6 @@ import { TodoRepository } from "./todo/todo.repository";
 import { type ITransactionManager, TRANSACTION_MANAGER } from "./transaction";
 import { UserRepository } from "./user/user.repository";
 
-/** Binds every application repository port to its SQL adapter. Add one line per repository. */
 export function registerRepositories() {
   container.register(DOMAIN_EVENT_OUTBOX, {
     useFactory: instanceCachingFactory((c) => createOutboxEventBus(c.resolve<ITransactionManager>(TRANSACTION_MANAGER))),

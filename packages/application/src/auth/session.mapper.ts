@@ -7,7 +7,6 @@ export interface ISessionDTO {
   expiresAt: string;
 }
 
-/** Stored record -> domain entity (rehydrate). */
 export function toSessionEntity(record: SessionRecord): SessionEntity {
   return SessionEntity.rehydrate({
     id: SessionId.rehydrate(record.id),
@@ -19,7 +18,6 @@ export function toSessionEntity(record: SessionRecord): SessionEntity {
   });
 }
 
-/** Domain entity -> stored record. */
 export function toSessionRecord(session: SessionEntity): SessionRecord {
   return {
     id: session.id.value,
@@ -31,7 +29,6 @@ export function toSessionRecord(session: SessionEntity): SessionRecord {
   };
 }
 
-/** Domain entity -> DTO returned to API callers. */
 export function toSessionDTO(session: SessionEntity): ISessionDTO {
   return { id: session.id.value, expiresAt: session.expiresAt.toISOString() };
 }

@@ -17,8 +17,8 @@
     "@app/env": "workspace:*",
     "@app/logger": "workspace:*",
     "@app/zod": "workspace:*",
-    "@millstream/core": "^0.4.0",
-    "@millstream/cqrs": "^0.4.0"
+    "@millstream/core": "^0.5.0",
+    "@millstream/cqrs": "^0.5.0"
   },
   "devDependencies": {
     "@app/typescript-config": "workspace:*",

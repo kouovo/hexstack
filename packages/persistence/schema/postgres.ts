@@ -5,7 +5,6 @@ import { tableName } from "./table-prefix";
 
 const pgTable = pgTableCreator(tableName);
 
-// Persist event times as PostgreSQL timestamptz while keeping JavaScript Date values.
 const timestamp = <TName extends string>(name: TName) => pgTimestamp(name, { withTimezone: true, mode: "date" });
 
 /** Example bounded context. Copy this table when adding a new one. */
@@ -26,7 +25,7 @@ export const todo = pgTable(
   ],
 );
 
-/** Accounts. `role` is the single RBAC role; permissions per role live in domain/src/rbac. */
+/** Permissions per role live in domain/src/rbac. */
 export const user = pgTable(
   "user",
   {
@@ -40,7 +39,7 @@ export const user = pgTable(
   (table) => [uniqueIndex("user_email_unique").on(table.email), check("user_role_check", sql`role in ('admin', 'member', 'viewer')`)],
 );
 
-/** Auth sessions. Only SHA-256(secret) is stored; the token never touches the database. */
+/** Only SHA-256(secret) is stored. */
 export const session = pgTable(
   "session",
   {

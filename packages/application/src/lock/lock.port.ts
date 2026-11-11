@@ -10,9 +10,8 @@ export function assertLockHeld(signal: LockSignal, resource: string): void {
 }
 
 /**
- * Distributed mutual exclusion. `using` acquires `resource`, auto-extends while `fn` runs and releases afterwards.
- * Contention past the retry budget throws `LockContentionError` (`@app/domain`).
- * A lock is an optimization/coordination tool, not a correctness guarantee: keep database constraints authoritative.
+ * Contention past the retry budget throws `LockContentionError`. A lock coordinates, it does not guarantee
+ * correctness: keep database constraints authoritative.
  */
 export interface LockPort {
   using<T>(resource: string, ttlMs: number, fn: (signal: LockSignal) => Promise<T>): Promise<T>;

@@ -5,10 +5,7 @@ import { Command, Option } from "clipanion";
 
 import { AppCommand } from "../base-command";
 
-/**
- * Trusted operator entry point, not a network endpoint. Use this to provision the first admin or recover
- * after demoting the last admin. Anyone able to run the CLI already has database/operator credentials.
- */
+/** Provisions the first admin / recovers after demoting the last one. Running the CLI already implies operator access. */
 export class UserRoleCliCommand extends AppCommand {
   static override paths = [["user", "role"]];
   static override usage = Command.Usage({ description: "Assign a user's role (admin, member, viewer); requires operator access" });

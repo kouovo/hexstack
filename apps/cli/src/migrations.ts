@@ -2,10 +2,7 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/**
- * Resolve the migrations copied with the API runtime image, or the source-tree
- * migrations when the CLI is run through tsx from apps/cli.
- */
+/** The API runtime image's copy, or the source tree when run through tsx. */
 export function resolveMigrationsRoot(): string {
   const configured = process.env.APP_MIGRATIONS_DIR?.trim();
   const here = dirname(fileURLToPath(import.meta.url));

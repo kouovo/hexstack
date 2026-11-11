@@ -1,9 +1,4 @@
-/**
- * The ONE place that names this project's tables.
- *
- * Every table is created through `pgTable` below and addressed through `tableName()`, so renaming the
- * prefix is a single edit here followed by `pnpm db:generate` (or editing the initial migration for a new project).
- */
+/** Renaming the prefix: edit it here, then `pnpm db:generate` (or edit the initial migration of a new project). */
 export const TABLE_PREFIX = "app_" as const;
 
 export type TableName<N extends string> = `${typeof TABLE_PREFIX}${N}`;

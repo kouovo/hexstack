@@ -5,9 +5,8 @@ import { container } from "@app/di";
 import { createMiddleware } from "hono/factory";
 
 /**
- * Resolves the session cookie to a principal for this request. It never rejects: anonymous requests continue,
- * and each procedure decides (oRPC meta: secure by default, `public: true` to opt out).
- * The role is read from the user row on every request, so role changes apply immediately.
+ * Never rejects: each procedure decides (secure by default, `public: true` opts out). The role is read from the
+ * user row on every request, so role changes apply immediately.
  */
 export const authenticate = () =>
   createMiddleware(async (c, next) => {

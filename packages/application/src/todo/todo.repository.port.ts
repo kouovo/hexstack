@@ -1,11 +1,7 @@
 import { inject } from "@app/di";
 import type { TodoEntity, TodoId, TodoSpecification, TodoStatusValue } from "@app/domain";
 
-/**
- * Stored shape of a todo, as the repository reads and writes it.
- * Declared next to the port so the mapper can live here without depending on persistence;
- * the SQL adapter's row type must stay assignable to it (tsc checks this in TodoRepository).
- */
+/** The SQL adapter's row type must stay assignable to this (tsc checks it in TodoRepository). */
 export interface TodoRecord {
   id: string;
   title: string;
@@ -22,18 +18,12 @@ export type FindTodosOptions = {
 
 export interface ITodoRepository {
   findOne(spec: TodoSpecification): Promise<TodoEntity | undefined>;
-  /** `spec` undefined = no filter. Newest first. */
+  /** Newest first. */
   find(spec: TodoSpecification | undefined, options: FindTodosOptions): Promise<TodoEntity[]>;
   insert(todo: TodoEntity): Promise<void>;
-  /**
-   * Conditional UPDATE: persists `todo` only while the stored status still equals `expected`.
-   * Returns false when another writer changed the row first (optimistic concurrency).
-   */
+  /** Optimistic concurrency: false when another writer changed the status first. */
   updateIfStatus(todo: TodoEntity, expected: TodoStatusValue): Promise<boolean>;
-  /**
-   * Conditional UPDATE: sets completion_notified_at once for a completed todo.
-   * Returns false when it was already set, so redelivered jobs become no-ops.
-   */
+  /** False when already set, so redelivered jobs are no-ops. */
   markCompletionNotified(id: TodoId, at: Date): Promise<boolean>;
 }
 

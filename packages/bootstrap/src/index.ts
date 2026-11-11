@@ -15,14 +15,10 @@ import { registerRedis } from "@app/redis";
 import { registerObjectStorage } from "@app/storage";
 
 export type RegisterDIOptions = {
-  /** Register BullMQ workers for a long-running process. */
   enableWorkers?: boolean;
 };
 
-/**
- * The transport-independent composition root. Order matters:
- * infrastructure ports first, then handlers that inject them.
- */
+/** Order matters: ports first, then the handlers that inject them. */
 export function registerDI({ enableWorkers = true }: RegisterDIOptions = {}): void {
   registerRequestContext();
 
@@ -33,8 +29,8 @@ export function registerDI({ enableWorkers = true }: RegisterDIOptions = {}): vo
   registerRepositories();
 
   registerRedis();
-  registerAuth(); // password hasher + rate limiter; before the handlers that inject them
-  registerCache(); // LOCK + CACHE
+  registerAuth();
+  registerCache();
   registerObjectStorage();
   registerPubSub();
   registerQueue({ enableWorkers });

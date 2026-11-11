@@ -18,7 +18,6 @@ function clientAddress(c: Context): string | undefined {
   }
 }
 
-/** Runs the rest of the request inside the AsyncLocalStorage request context. */
 export const requestContext = () =>
   createMiddleware(async (c, next) => {
     const requestId = c.req.header(REQUEST_ID_HEADER) ?? generateId("req");

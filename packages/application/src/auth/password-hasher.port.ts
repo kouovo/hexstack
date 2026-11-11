@@ -1,10 +1,7 @@
 import { inject } from "@app/di";
 import type { Password, PasswordHash } from "@app/domain";
 
-/**
- * Slow, salted password hashing (Argon2id in packages/auth).
- * Implementations must keep hashing off the event loop and compare in constant time.
- */
+/** Implementations must hash off the event loop and compare in constant time. */
 export interface PasswordHasher {
   /** Only policy-checked passwords can be hashed: the type forces `Password.create()` first. */
   hash(password: Password): Promise<PasswordHash>;

@@ -33,7 +33,7 @@ export class SessionService {
     return { session, token };
   }
 
-  /** Resolves a token to its user, or null. Expired sessions are deleted on sight. */
+  /** Expired sessions are deleted on sight. */
   async validate(token: string, now = new Date()): Promise<ValidatedSession | null> {
     const parsed = parseSessionToken(token);
     if (!parsed) return null;

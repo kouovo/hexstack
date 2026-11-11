@@ -2,16 +2,9 @@ import { inject } from "@app/di";
 
 export type ApplicationTransactionOptions = {
   isolationLevel?: "read committed" | "repeatable read" | "serializable";
-  /**
-   * Override statement timeout for this transaction (milliseconds).
-   * 0 disables the timeout for this call. When omitted, the adapter applies
-   * the default or heavy env timeout based on {@link heavy}.
-   */
+  /** 0 disables it. Omitted: the env default, or the heavy one with {@link heavy}. */
   statementTimeoutMs?: number;
-  /**
-   * Use the configured heavy-operation timeout (purge / cascade teardown).
-   * Ignored when {@link statementTimeoutMs} is set explicitly.
-   */
+  /** Heavy-operation timeout (purge / cascade teardown). */
   heavy?: boolean;
 };
 

@@ -6,10 +6,7 @@ const SESSION_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 /** Ticks of the pre-millstream outbox relay; their BullMQ schedulers would otherwise keep producing jobs. */
 const RETIRED_TICK_JOBS = ["outbox-relay-tick", "outbox-cleanup-tick"];
 
-/**
- * Periodic maintenance runs as BullMQ repeatable jobs, so with N replicas each tick executes once
- * cluster-wide. Add new ticks here (register + scheduleRepeat).
- */
+/** BullMQ repeatable jobs: each tick runs once cluster-wide, whatever the replica count. */
 export const startMaintenanceScheduler = async (): Promise<void> => {
   const dispatcher = container.resolve<JobDispatcher>(JOB_DISPATCHER);
   const sessions = container.resolve(SessionService);

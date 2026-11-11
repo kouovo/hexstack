@@ -21,10 +21,7 @@ export class InMemoryVersionStore implements VersionStore {
   }
 }
 
-/**
- * One persistent key per namespace (`<prefix>:cver:<namespace>`, no TTL). Requires Redis `maxmemory-policy noeviction`
- * (already mandatory for BullMQ): an evicted version key would reset to 0 and could resurrect old entries.
- */
+/** Needs Redis `maxmemory-policy noeviction` (as BullMQ does): an evicted version would resurrect old entries. */
 export class RedisVersionStore implements VersionStore {
   constructor(
     private readonly redis: Redis,
@@ -42,8 +39,7 @@ export class RedisVersionStore implements VersionStore {
   }
 
   async incr(namespace: string): Promise<number> {
-    // INCR is not idempotent; an over-bump only costs a later miss (never staleness), so
-    // at-least-once redelivery (outbox relay, BullMQ retries) is safe here.
+    // Not idempotent, but an extra bump only costs a miss, so at-least-once redelivery is safe.
     return this.redis.incr(this.key(namespace));
   }
 }

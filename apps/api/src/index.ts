@@ -22,7 +22,7 @@ const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
 // Run `pnpm db:migrate` (CLI) as a one-shot step before rolling out new API code.
 await startMaintenanceScheduler();
 
-// Outbox relay + durable consumers (millstream router); runs in every replica.
+// Runs in every replica.
 const domainEvents = container.resolve<DomainEventPipeline>(DOMAIN_EVENT_PIPELINE);
 await domainEvents.start();
 

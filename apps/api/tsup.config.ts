@@ -1,10 +1,6 @@
 import { defineConfig } from "tsup";
 
-/**
- * Single-file API bundle: apps/api + all workspace sources + almost all npm dependencies.
- * Only packages that break when bundled stay external (pino's worker transport).
- * Production runs with NODE_ENV=production so pino-pretty is unused.
- */
+/** Bundles everything except packages that break when bundled (pino's worker transport). */
 export default defineConfig({
   entry: ["src/index.ts"],
   format: ["esm"],

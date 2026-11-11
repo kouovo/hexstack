@@ -2,7 +2,7 @@ import type { TodoEntity } from "@app/domain";
 import { expect, test, vi } from "vitest";
 
 import { uncached } from "../cache/cache.test-helper";
-import { InProcessEventBus } from "../events/in-process-event-bus";
+import { createInProcessEventBus } from "../events/in-process-event-bus";
 import { IN_PROCESS_EVENT_SUBSCRIPTIONS } from "../events/subscriptions";
 import { DomainEventScope } from "../shared/domain-event-scope";
 import type { ApplicationTransactionPort } from "../transaction";
@@ -49,7 +49,7 @@ function setup() {
   // The real millstream in-process bus with the app's cache-invalidation subscriptions, on this test's cache.
   const invalidation = new TodoListCacheInvalidationHandler(cache);
   const subscriptions = IN_PROCESS_EVENT_SUBSCRIPTIONS.filter(({ handler }) => handler === TodoListCacheInvalidationHandler);
-  const bus = new InProcessEventBus(subscriptions, () => invalidation as never);
+  const { bus } = createInProcessEventBus(subscriptions, () => invalidation as never);
   const scope = new DomainEventScope(transaction, outbox, bus);
 
   return {

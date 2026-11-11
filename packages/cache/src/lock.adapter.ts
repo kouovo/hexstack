@@ -41,11 +41,8 @@ export class InMemoryLockAdapter implements LockPort {
 }
 
 /**
- * Single-node Redis lock (redlock-universal `SimpleLock`: `SET NX PX` + Lua release/extend).
- * `using` auto-extends the lease while `fn` runs and aborts the signal (with `.error`) if an extension fails;
- * `fn`'s own errors propagate unchanged and release failures are swallowed (the lease then expires by TTL).
- * Exhausted acquisition retries, whether from contention or a Redis outage, become `LockContentionError`
- * (kind `locked`, retryable). The underlying cause is logged, never exposed.
+ * Single-node Redis lock. The lease auto-extends while `fn` runs; a failed extension aborts the signal. Release
+ * failures are swallowed (the lease expires by TTL). Exhausted retries (contention or outage) → `LockContentionError`.
  */
 export class RedisLockAdapter implements LockPort {
   private readonly logger = createLogger(RedisLockAdapter.name);

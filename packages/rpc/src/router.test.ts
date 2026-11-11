@@ -75,7 +75,6 @@ beforeAll(() => {
   registerDomainCqrsHandlers();
 });
 
-/** A router client acting as `principal` (what the HTTP auth middleware sets up per request). */
 function clientAs(principal?: RequestPrincipal) {
   const client = createRouterClient(router, { context: () => ({ resHeaders: new Headers() }) });
   const run = <T>(fn: (c: typeof client) => Promise<T>) => requestContextStorage.run({ requestId: "test", principal }, () => fn(client));

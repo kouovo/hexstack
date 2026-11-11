@@ -230,7 +230,7 @@ These are local trade-offs, not universal DDD rules:
 | Layer packages, with context folders inside them                        | Keep `packages/application` together instead of creating separate ports/usecases packages; related `todo` files span a few explicit layers                            |
 | Repository/specification-based reads                                    | The example query handlers use the same domain/repository vocabulary as commands; no separate SQL projection layer yet                                                |
 | Shared Zod schemas for inputs and value-object guards where appropriate | Less validation duplication, at the cost of a deliberate validation-library dependency in the core                                                                    |
-| Pure mapper functions in application                                    | `toXEntity`, `toXRecord`, and `toXDTO` live in one file per aggregate, without DI; stored record shapes are consequently visible to application code                 |
+| Pure mapper functions in application                                    | `toXEntity`, `toXRecord`, and `toXDTO` live in one file per aggregate, without DI; stored record shapes are consequently visible to application code                  |
 | Typed errors, ordinary throws                                           | Business failures extend `DomainError` with a literal `_tag` and typed fields; HTTP/RPC translate them centrally and BullMQ reads `retryable` (see [Errors](#errors)) |
 | Post-commit in-process events                                           | Logging/broadcast failures cannot roll back successful writes; required side effects use the outbox instead                                                           |
 
@@ -582,13 +582,13 @@ export const DURABLE_EVENT_SUBSCRIPTIONS = [
 
 There are two deliberately different mechanisms, both run by millstream's `EventBus` / `EventProcessor`:
 
-|              | In-process                                                                                                             | Durable                                                                                                                       |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Example      | [Todo logging handlers](packages/application/src/todo/events), [list-cache invalidation](packages/application/src/todo/todo-cache-invalidation.ts) | [DispatchTodoCompletedOutboxHandler](packages/application/src/todo/todo-outbox-handlers.ts)                                   |
-| Execution    | After commit, in the same process: [InProcessEventBus](packages/application/src/events/in-process-event-bus.ts) (`MemoryPubSub` + `dropOnError`) | The relay moves the committed envelope to one BullMQ queue per subscription (`<event name>.<subscription name>`)              |
-| Guarantee    | Best-effort; failures cannot fail a committed command; process death can lose delivery                                 | At-least-once; BullMQ owns attempts, backoff and failed-job retention                                                         |
-| Suitable for | Non-critical logging, cache invalidation, broadcasts                                                                   | Side effects that require durable delivery, such as enqueueing a job                                                          |
-| Registration | `IN_PROCESS_EVENT_SUBSCRIPTIONS`                                                                                       | `DURABLE_EVENT_SUBSCRIPTIONS`                                                                                                 |
+|              | In-process                                                                                                                                                                                          | Durable                                                                                                          |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Example      | [Todo logging handlers](packages/application/src/todo/events), [list-cache invalidation](packages/application/src/todo/todo-cache-invalidation.ts)                                                  | [DispatchTodoCompletedOutboxHandler](packages/application/src/todo/todo-outbox-handlers.ts)                      |
+| Execution    | After commit, in the same process: a millstream `EventBus` from [createInProcessEventBus](packages/application/src/events/in-process-event-bus.ts) (`MemoryPubSub` + `dropOnError`, fully parallel) | The relay moves the committed envelope to one BullMQ queue per subscription (`<event name>.<subscription name>`) |
+| Guarantee    | Best-effort; failures cannot fail a committed command; process death can lose delivery                                                                                                              | At-least-once; BullMQ owns attempts, backoff and failed-job retention                                            |
+| Suitable for | Non-critical logging, cache invalidation, broadcasts                                                                                                                                                | Side effects that require durable delivery, such as enqueueing a job                                             |
+| Registration | `IN_PROCESS_EVENT_SUBSCRIPTIONS`                                                                                                                                                                    | `DURABLE_EVENT_SUBSCRIPTIONS`                                                                                    |
 
 The outbox stores only events with at least one durable subscription (`DURABLE_EVENT_NAMES`, derived from the list).
 Here that is `TodoCompletedEvent`; creation/archive events have in-process handlers only. Every event is broadcast in
@@ -702,11 +702,11 @@ duplicate the query, the repository, or the cache. The HTTP app owns the route b
 curl -b /tmp/app-cookies 'localhost:3001/todos?status=open&limit=10'
 ```
 
-| | oRPC `GET /rpc/todo/list` | REST `GET /todos` |
-| --- | --- | --- |
-| Input | `?data=` JSON envelope, or a JSON body | `status` and `limit` query parameters |
-| Success | `{ "json": [ ... ] }` | `{ "todos": [ ... ] }` |
-| Auth | procedure `meta` (`todo:read`) | the route checks the principal itself |
+|         | oRPC `GET /rpc/todo/list`              | REST `GET /todos`                     |
+| ------- | -------------------------------------- | ------------------------------------- |
+| Input   | `?data=` JSON envelope, or a JSON body | `status` and `limit` query parameters |
+| Success | `{ "json": [ ... ] }`                  | `{ "todos": [ ... ] }`                |
+| Auth    | procedure `meta` (`todo:read`)         | the route checks the principal itself |
 
 Both return the same [todo DTO](packages/application/src/todo/todo.dto.ts): `id`, `title`, `status`, `completedAt`,
 `completionNotifiedAt`, `createdAt`, `updatedAt`. `status` is `open`, `completed`, or `archived`. `limit` defaults to

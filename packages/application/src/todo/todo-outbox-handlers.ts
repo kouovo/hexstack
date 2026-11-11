@@ -9,10 +9,7 @@ import {
   notifyTodoCompletedJobPayloadSchema,
 } from "./jobs/notify-todo-completed.job";
 
-/**
- * Durable subscription (see events/subscriptions.ts): runs from its own BullMQ queue and hands off to a dedicated job.
- * Delivery is at-least-once; the deterministic job id makes a redelivery a no-op while the job is retained.
- */
+/** At-least-once: the deterministic job id makes a redelivery a no-op while the job is retained. */
 @singleton()
 export class DispatchTodoCompletedOutboxHandler implements EventHandler<TodoCompletedEvent> {
   constructor(@injectJobDispatcher() private readonly dispatcher: JobDispatcher) {}
