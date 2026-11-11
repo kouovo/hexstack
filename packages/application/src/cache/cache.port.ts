@@ -4,9 +4,9 @@ import { inject } from "@app/di";
 export const CACHE_EMPTY_TTL_SECONDS = 30;
 
 export interface CacheGetOptions {
-  /** Log label for this read path (e.g. `"todo-list"`). Defaults to `"default"`. */
+  /** Log label for this read path. */
   statsType?: string;
-  /** Single-flight the loader across replicas with the `LockPort` (double-checks the cache after acquiring). */
+  /** Single-flight misses across replicas. */
   lock?: boolean;
   /** Distinguishes filters/limits/cursors under one versioned namespace. Keep it short: hash large inputs. */
   queryKey?: string;
@@ -15,13 +15,9 @@ export interface CacheGetOptions {
 }
 
 /**
- * JSON-compatible read cache (cache DTOs, never entities, sessions, password hashes or authorization decisions).
- *
- * - `getOrSet` caches the loader result. `undefined` and `NotFoundException` are cached as a short negative entry
- *   and replayed on hit; every other loader error propagates and is not cached.
- * - `getOrSetVersioned` stores entries under the namespace's current version. `bumpVersion` (after commit) makes every
- *   entry of that namespace unreachable at once, without key scans; stale entries expire by TTL.
- * - Store failures are fail-open: a read failure is a miss, a write failure leaves the database result untouched.
+ * JSON read cache: cache DTOs, never entities, sessions, password hashes or authorization decisions.
+ * `undefined` and `NotFoundException` are cached as short negative entries; other loader errors are not cached.
+ * `bumpVersion` (after commit) invalidates a whole versioned namespace without key scans. Store failures fail open.
  */
 export interface CachePort {
   get<T>(key: string, options?: CacheGetOptions): Promise<T | undefined>;

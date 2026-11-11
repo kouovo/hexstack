@@ -7,7 +7,6 @@ import type { TodoRecord } from "./todo.repository.port";
 const toDate = (value: Date | string): Date => new Date(value);
 const toNullableDate = (value: Date | string | null): Date | null => (value === null ? null : new Date(value));
 
-/** Stored record -> domain entity (rehydrate). */
 export function toTodoEntity(record: TodoRecord): TodoEntity {
   return TodoEntity.rehydrate({
     id: TodoId.rehydrate(record.id),
@@ -20,7 +19,6 @@ export function toTodoEntity(record: TodoRecord): TodoEntity {
   });
 }
 
-/** Domain entity -> stored record. */
 export function toTodoRecord(todo: TodoEntity): TodoRecord {
   return {
     id: todo.id.value,
@@ -33,7 +31,6 @@ export function toTodoRecord(todo: TodoEntity): TodoRecord {
   };
 }
 
-/** Domain entity -> DTO returned to API callers. */
 export function toTodoDTO(todo: TodoEntity): ITodoDTO {
   return {
     id: todo.id.value,

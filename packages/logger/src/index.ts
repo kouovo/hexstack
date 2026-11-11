@@ -33,7 +33,7 @@ export interface FieldsLogger {
   error(msg: string, fields?: Record<string, unknown>): void;
 }
 
-/** Adapts pino to message-first loggers; an `error` field becomes pino's serialized `err`. */
+/** An `error` field becomes pino's serialized `err`. */
 const toPinoFields = (extra?: Record<string, unknown>) => {
   if (!extra || !("error" in extra)) return extra ?? {};
   const { error, ...rest } = extra;

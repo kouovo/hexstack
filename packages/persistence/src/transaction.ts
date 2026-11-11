@@ -19,10 +19,7 @@ export interface TransactionScope {
 
 export interface TransactionOptions {
   isolationLevel?: IsolationLevel;
-  /**
-   * Apply `SET LOCAL statement_timeout` for the duration of this transaction.
-   * Nested `withTransaction` reuses the outer scope and does not re-apply.
-   */
+  /** Not re-applied by a nested `withTransaction` (it joins the outer one). */
   statementTimeoutMs?: number;
 }
 
@@ -55,7 +52,6 @@ export function registerTransactionManager() {
   }
 }
 
-/** Format a positive ms value for Postgres `statement_timeout` / `set_config`. */
 export function formatStatementTimeout(ms: number): string {
   if (!Number.isFinite(ms) || ms <= 0) {
     throw new Error(`statementTimeoutMs must be a positive number, got ${ms}`);

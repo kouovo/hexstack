@@ -9,7 +9,6 @@ export interface JobHandlerMetadata {
   options: RegisterJobOptions;
 }
 
-/** Marks a class's process method, or an explicitly decorated method, as an MQ consumer. */
 export function jobHandler(name: string, options: RegisterJobOptions = {}): ClassDecorator & MethodDecorator {
   return (target: object, propertyKey?: string | symbol): void => {
     const handler = propertyKey === undefined ? target : target.constructor;

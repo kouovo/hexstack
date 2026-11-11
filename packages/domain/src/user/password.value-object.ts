@@ -3,11 +3,7 @@ import { z } from "@app/zod";
 
 import { PasswordPolicyViolationError } from "../errors/user.errors";
 
-/**
- * Password policy (domain invariant for every NEW password):
- * 8-100 printable ASCII characters, no leading/trailing space, no composition rules.
- * Invalid input is rejected with a reason, never silently trimmed or modified.
- */
+/** Policy for new passwords; no composition rules on purpose. Invalid input is rejected, never trimmed. */
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 100;
 
@@ -18,10 +14,7 @@ export const passwordSchema = z
   .regex(/^[\x20-\x7E]*$/, "Password may only contain printable ASCII characters")
   .refine((value) => value.trim() === value, "Password must not start or end with a space");
 
-/**
- * A plaintext password that satisfies the policy. Short-lived: exists only between the request and hashing.
- * It never serialises its secret: toJSON/toString are explicitly redacted.
- */
+/** Lives only between the request and hashing; toJSON/toString are redacted. */
 export class Password extends ValueObject<string> {
   private constructor(value: string) {
     super(value);
@@ -38,7 +31,7 @@ export class Password extends ValueObject<string> {
     return Password.parse(value);
   }
 
-  /** The secret itself; only the PasswordHasher should read this. */
+  /** Only the PasswordHasher should read this. */
   reveal(): string {
     return this.state;
   }

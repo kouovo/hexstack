@@ -22,7 +22,6 @@ type Tables = {
   session: SessionTable;
 };
 
-/** Kysely database type; keys carry TABLE_PREFIX. */
 export type Database = { [K in keyof Tables as `${typeof TABLE_PREFIX}${K}`]: Tables[K] };
 
 export const TODO_TABLE = tableName("todo");

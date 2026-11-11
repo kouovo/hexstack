@@ -17,7 +17,6 @@ export type IArchiveTodoCommand = z.infer<typeof archiveTodoCommand>;
 export const ArchiveTodoCommand = defineCommand("todo.archive", archiveTodoCommand).returns<ITodoDTO>();
 export type ArchiveTodoCommand = RequestPayload<typeof ArchiveTodoCommand>;
 
-/** open|completed -> archived. Thrown domain errors roll back the transaction. */
 @singleton()
 export class ArchiveTodoCommandHandler implements IRequestHandler<typeof ArchiveTodoCommand> {
   constructor(

@@ -17,7 +17,6 @@ export type ICompleteTodoCommand = z.infer<typeof completeTodoCommand>;
 export const CompleteTodoCommand = defineCommand("todo.complete", completeTodoCommand).returns<ITodoDTO>();
 export type CompleteTodoCommand = RequestPayload<typeof CompleteTodoCommand>;
 
-/** open -> completed. Thrown domain errors roll back the transaction. */
 @singleton()
 export class CompleteTodoCommandHandler implements IRequestHandler<typeof CompleteTodoCommand> {
   constructor(

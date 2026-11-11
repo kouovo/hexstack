@@ -19,11 +19,7 @@ export type NotifyTodoCompletedJobPayload = z.infer<typeof notifyTodoCompletedJo
 /** Deterministic job id: BullMQ ignores a second enqueue while the first job is still retained. */
 export const notifyTodoCompletedJobId = (todoId: string) => `todo-completed__${todoId}`;
 
-/**
- * Delivery is at-least-once (outbox retries + BullMQ retries), so the handler must be idempotent.
- * The conditional UPDATE is the idempotency gate: only the first run flips completion_notified_at.
- * Put real side effects (email, webhook, …) after a successful claim and give them the same idempotency key.
- */
+/** At-least-once: real side effects (email, webhook…) go after a successful claim, with the same idempotency key. */
 @jobHandler(NOTIFY_TODO_COMPLETED_JOB_NAME)
 @singleton()
 export class NotifyTodoCompletedJobHandler {
@@ -41,7 +37,7 @@ export class NotifyTodoCompletedJobHandler {
       this.logger.debug({ todoId }, "todo completion already notified; skipping duplicate delivery");
       return;
     }
-    // This write bypasses command events (no in-process event), so invalidate directly after the SQL statement succeeds.
+    // This write raises no domain event, so invalidate here.
     await this.cache.bumpVersion(TODO_LIST_CACHE_NAMESPACE);
     this.logger.info({ todoId }, "todo completion notified");
   }

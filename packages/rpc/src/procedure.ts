@@ -10,21 +10,18 @@ export type RpcProcedureMeta = {
   type?: "query" | "mutation";
   /** Opt out of the default "must be signed in" rule (sign-in, sign-up, me). */
   public?: boolean;
-  /** RBAC: the caller's role must grant all of these (see domain/src/rbac). */
+  /** The caller's role must grant all of these. */
   permissions?: Permissions;
 };
 
-/** The signed-in caller. Only valid inside non-public procedures (the auth middleware guarantees it). */
+/** Only valid inside non-public procedures. */
 export function currentPrincipal(): RequestPrincipal {
   const principal = container.resolve(RequestContext).getPrincipal();
   if (!principal) throw new UnauthorizedException("Sign in required");
   return principal;
 }
 
-/**
- * Every procedure: maps thrown tagged errors -> ORPCError, then enforces authentication and RBAC from `meta`.
- * Secure by default: a procedure without `public: true` rejects anonymous callers with 401.
- */
+/** Secure by default: without `public: true`, anonymous callers get 401. */
 const rpc = os
   .$context<ResponseHeadersPluginContext>()
   .$meta<RpcProcedureMeta>({ type: "query" })

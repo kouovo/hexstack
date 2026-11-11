@@ -4,13 +4,8 @@ import { createMiddleware } from "hono/factory";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /**
- * CSRF defence for cookie auth (SameSite=Lax is one layer; this is the second).
- * Unsafe methods must come from this origin or a trusted origin:
- *   1. `Sec-Fetch-Site: same-origin` (set by modern browsers) -> allow.
- *   2. Else `Origin` must be this server's origin or in `trustedOrigins` (the web app) -> allow.
- *   3. No `Origin` and no cross-site signal -> a non-browser client (curl, server-to-server) carries no
- *      ambient cookies, so CSRF does not apply -> allow.
- * Never use GET for state changes: oRPC mutations are POST.
+ * Second CSRF layer after SameSite=Lax. No `Origin` and no cross-site signal means a non-browser client, which
+ * carries no ambient cookies, so it is allowed. Never use GET for state changes.
  */
 export const csrf = ({ trustedOrigins }: { trustedOrigins: readonly string[] }) =>
   createMiddleware(async (c, next) => {

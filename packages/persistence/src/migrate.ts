@@ -13,14 +13,12 @@ const logger = createLogger("migrate");
 const MIGRATION_ADVISORY_LOCK_KEY = 1801676911;
 
 export type MigrateOptions = {
-  /** Directory containing `postgres/` (drizzle-kit output). */
   migrationsRoot?: string;
 };
 
 /**
- * Applies pending migrations under a session-level advisory lock so concurrent deploys
- * (several replicas / a Helm hook racing a manual run) apply each migration exactly once.
- * Session locks do not survive a transaction-mode pooler, so this uses POSTGRES_DIRECT_URL.
+ * The advisory lock makes concurrent deploys apply each migration once. Session locks do not survive a
+ * transaction-mode pooler, hence POSTGRES_DIRECT_URL.
  */
 export async function migrate({ migrationsRoot = "./drizzle" }: MigrateOptions = {}): Promise<void> {
   const pg = postgres(requireDirectPostgresUrl(), { max: 1, onnotice: () => {} });

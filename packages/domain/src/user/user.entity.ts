@@ -9,7 +9,7 @@ import { UserRole } from "./user-role.value-object";
 
 export interface IUserState extends IEntityState<UserId> {
   email: UserEmail;
-  /** Produced by the PasswordHasher port from a policy-checked Password. Never leaves the server. */
+  /** Never leaves the server. */
   passwordHash: PasswordHash;
   role: UserRole;
   createdAt: Date;
@@ -37,11 +37,7 @@ export class UserEntity extends AggregateRoot<IUserState> {
     return this.state.updatedAt;
   }
 
-  /**
-   * Builds a new user from specifications: the defaults below, then each spec writes its own value.
-   * Email and password hash have no default; callers pass UserEmailSpecification and
-   * UserPasswordHashSpecification (the sign-up handler always does).
-   */
+  /** Email and password hash have no default: pass UserEmailSpecification and UserPasswordHashSpecification. */
   static signUp(spec: UserSpecification, at = new Date()): UserEntity {
     const state = spec.create({
       id: UserId.generate(),
@@ -58,13 +54,12 @@ export class UserEntity extends AggregateRoot<IUserState> {
     return new UserEntity({ ...state });
   }
 
-  /** Replaces the stored hash (e.g. after a password change or a hash-parameter upgrade). */
   changePasswordHash(passwordHash: PasswordHash, at = new Date()): void {
     this.state.passwordHash = passwordHash;
     this.state.updatedAt = at;
   }
 
-  /** Returns false (and records nothing) when the role is unchanged. */
+  /** False (and no event) when the role is unchanged. */
   changeRole(role: UserRole, at = new Date()): boolean {
     if (role.equals(this.state.role)) return false;
     const previousRole = this.state.role.value;

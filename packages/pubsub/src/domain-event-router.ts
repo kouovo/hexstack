@@ -3,27 +3,20 @@ import type { Middleware, Publisher, Router, Subscriber } from "@millstream/core
 import { EventProcessor } from "@millstream/cqrs";
 import { addForwarder } from "@millstream/forwarder";
 
-/** Router handler name of the outbox relay. */
 export const OUTBOX_RELAY_HANDLER = "outbox-relay";
 
 export interface DomainEventRouterOptions {
-  /** Reads the committed outbox (forwarder envelopes). */
   outbox: { subscriber: Subscriber; topic: string };
-  /** Broker the relay publishes to. Must deliver each event to every subscription listed for it. */
+  /** Must deliver each event to every subscription listed for it. */
   broker: Publisher;
   subscriptions: readonly EventSubscription[];
-  /** Broker subscription of one durable subscription; `handlerName` is the subscription name (the consumer group). */
+  /** `handlerName` is the subscription name (the consumer group). */
   consumerSubscriber: (p: { handlerName: string; topic: string }) => Subscriber;
-  /** Applied to every consumer handler (inside the router-level middlewares). */
   consumerMiddlewares?: Middleware[];
   resolve: ResolveHandler;
 }
 
-/**
- * Wires the durable event flow onto `router`:
- * outbox (committed in the business transaction) → relay → broker → millstream EventProcessor → handlers.
- * Transport-agnostic so it can be exercised with in-memory Pub/Sub.
- */
+/** outbox → relay → broker → handlers. Transport-agnostic, so tests run it on in-memory Pub/Sub. */
 export function addDomainEventHandlers(router: Router, opts: DomainEventRouterOptions): void {
   const subscribed = new Set(opts.subscriptions.map(({ event }) => event.name));
 

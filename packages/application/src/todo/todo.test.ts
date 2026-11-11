@@ -19,17 +19,13 @@ import { ListTodosQueryHandler } from "./queries/list-todos.query";
 import { DispatchTodoCompletedOutboxHandler } from "./todo-outbox-handlers";
 import type { ITodoRepository } from "./todo.repository.port";
 
-/**
- * In-memory stand-in that honours the same conditional-update contract as the SQL adapter.
- * `status`/`notified` model the stored columns; the entity instance may be mutated ahead of them.
- */
+/** Same conditional-update contract as the SQL adapter; `status`/`notified` model the stored columns. */
 class InMemoryTodoRepository implements ITodoRepository {
   readonly rows = new Map<string, { status: TodoStatusValue; notified: boolean; todo: TodoEntity }>();
 
   async insert(todo: TodoEntity) {
     this.rows.set(todo.id.value, { status: todo.status.value, notified: false, todo });
   }
-  // Specs are evaluated in memory here and translated to SQL by the persistence query visitor.
   async findOne(spec: TodoSpecification) {
     return [...this.rows.values()].map((row) => row.todo).find((todo) => spec.isSatisfiedBy(todo));
   }

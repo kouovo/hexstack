@@ -1,14 +1,10 @@
-/** Allowed next states for every state. A state with no targets is terminal. */
+/** A state with no targets is terminal. */
 export type TransitionTable<TState extends string> = { readonly [K in TState]: readonly TState[] };
 
-/**
- * Minimal, dependency-free finite state machine over string states.
- * Designed for persisted status value objects: it is stateless and
- * validates transitions between a current value and a requested next value.
- */
+/** Stateless: validates a transition between a persisted status and a requested one. */
 export class StateMachine<TState extends string> {
   constructor(
-    /** Human-readable subject used in error messages, e.g. "app build". */
+    /** Used in error messages, e.g. "app build". */
     readonly subject: string,
     private readonly table: TransitionTable<TState>,
   ) {}
@@ -29,7 +25,7 @@ export class StateMachine<TState extends string> {
     return this.table[state].length === 0;
   }
 
-  /** The caller supplies its domain error, keeping this utility independent of @app/domain. */
+  /** The caller supplies its domain error, so this stays independent of @app/domain. */
   assert(from: TState, to: TState, onInvalid: () => Error): void {
     if (!this.can(from, to)) throw onInvalid();
   }

@@ -2,10 +2,7 @@ import { ValueObject } from "@app/core";
 
 import { PasswordHashInvalidError } from "../errors/user.errors";
 
-/**
- * The stored password hash: an opaque, self-describing string (PHC format, produced by the PasswordHasher port).
- * The domain never inspects it; it only carries it between the hasher and the repository.
- */
+/** Opaque PHC string: the domain never inspects it. */
 export class PasswordHash extends ValueObject<string> {
   private constructor(value: string) {
     super(value);

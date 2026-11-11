@@ -1,10 +1,6 @@
 import type { Redis } from "@app/redis";
 import type { KeyvStoreAdapter } from "keyv";
 
-/**
- * Keyv store over the shared ioredis client. Keyv prefixes keys with its namespace (`<namespace>:<key>`) and
- * serializes `{ value, expires }`; this store only moves strings and maps Keyv's millisecond TTL to `PX`.
- */
 export class KeyvIoredisStore implements KeyvStoreAdapter {
   opts: Record<string, unknown> = {};
   namespace: string | undefined;
@@ -32,7 +28,7 @@ export class KeyvIoredisStore implements KeyvStoreAdapter {
     return (await this.redis.exists(key)) === 1;
   }
 
-  /** Operational use only (CLI/tests); request paths invalidate with versions, never with scans. */
+  /** CLI/tests only: request paths invalidate with versions, never scans. */
   async clear(): Promise<void> {
     const ns = this.namespace;
     if (!ns) throw new Error("Refusing to clear a Keyv store without a namespace (would SCAN the whole Redis database)");

@@ -39,15 +39,7 @@ function errorType(err: unknown): string {
   return err instanceof Error ? err.name : "unknown";
 }
 
-/**
- * `CachePort` over Keyv (Redis in production, an in-process Map for `CACHE_DRIVER=memory`/tests).
- *
- * - Hits/misses/negative entries are distinguished by `lookup`; `undefined` and `NotFoundException` are cached briefly.
- * - `lock: true` single-flights a miss across replicas and double-checks the cache after acquiring the lock.
- * - Versioned namespaces: the value key embeds the namespace version; `bumpVersion` increments it (no key scans).
- * - Keyv swallows store errors (emits `error`): a failed read is a miss, a failed write keeps the loaded result.
- *   A failed version read bypasses the cache for that call. Loader errors are never retried here.
- */
+/** Keyv swallows store errors (emits `error`): a failed read is a miss, a failed write keeps the loaded result. */
 export class KeyvCacheAdapter implements CachePort {
   private readonly logger = createLogger(KeyvCacheAdapter.name);
 

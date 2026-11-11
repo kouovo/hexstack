@@ -11,7 +11,7 @@ export interface ITodoState extends IEntityState<TodoId> {
   title: TodoTitle;
   status: TodoStatus;
   completedAt: Date | null;
-  /** Set once by the async completion job; see ITodoRepository.markCompletionNotified. */
+  /** Set once by the completion job (ITodoRepository.markCompletionNotified). */
   completionNotifiedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -42,11 +42,7 @@ export class TodoEntity extends AggregateRoot<ITodoState> {
     return this.state.updatedAt;
   }
 
-  /**
-   * Builds a new todo from specifications: the defaults below, then each spec writes its own value
-   * (e.g. `new TodoTitleSpecification(title).and(new TodoIdSpecification(id))`).
-   * The title has no default; callers must pass a TodoTitleSpecification (the command schema guarantees one).
-   */
+  /** The title has no default: pass a TodoTitleSpecification. */
   static create(spec: TodoSpecification, at = new Date()): TodoEntity {
     const state = spec.create({
       id: TodoId.generate(),
@@ -65,14 +61,12 @@ export class TodoEntity extends AggregateRoot<ITodoState> {
     return new TodoEntity({ ...state });
   }
 
-  /** open -> completed. A rejected transition leaves state and events unchanged. */
   complete(at = new Date()): void {
     this.transitionTo("completed", at);
     this.state.completedAt = at;
     this.addDomainEvent(TodoCompletedEvent, { todoId: this.id.value, completedAt: at });
   }
 
-  /** open|completed -> archived. A rejected transition leaves state and events unchanged. */
   archive(at = new Date()): void {
     const previousStatus = this.state.status.value;
     this.transitionTo("archived", at);

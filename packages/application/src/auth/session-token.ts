@@ -1,10 +1,8 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 /**
- * Session token = `<id>.<secret>`.
- * - id: identifies the row and can be logged / referenced without leaking a credential.
- * - secret: 32 random bytes (CSPRNG); only its SHA-256 is stored, so a DB leak yields no usable token.
- * A fast hash is fine here (unlike passwords) because the secret has 256 bits of entropy.
+ * `<id>.<secret>`: the id can be logged; only the secret's SHA-256 is stored, so a DB leak yields no usable token.
+ * A fast hash is fine (unlike passwords): the secret has 256 bits of entropy.
  */
 const ID_BYTES = 15; // 120 bits, 20 base64url chars
 const SECRET_BYTES = 32;
@@ -37,7 +35,6 @@ export function parseSessionToken(token: string): { id: string; secret: Buffer }
   return { id, secret: bytes };
 }
 
-/** Constant-time comparison of two hex digests. */
 export function secretHashMatches(expectedHex: string, secret: Uint8Array): boolean {
   const expected = Buffer.from(expectedHex, "hex");
   const actual = Buffer.from(hashSessionSecret(secret), "hex");

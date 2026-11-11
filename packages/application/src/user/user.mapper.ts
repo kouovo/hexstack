@@ -3,7 +3,6 @@ import { PasswordHash, UserEmail, UserEntity, UserId, UserRole } from "@app/doma
 import type { IUserDTO } from "./user.dto";
 import type { UserRecord } from "./user.repository.port";
 
-/** Stored record -> domain entity (rehydrate). */
 export function toUserEntity(record: UserRecord): UserEntity {
   return UserEntity.rehydrate({
     id: UserId.rehydrate(record.id),
@@ -15,7 +14,6 @@ export function toUserEntity(record: UserRecord): UserEntity {
   });
 }
 
-/** Domain entity -> stored record. */
 export function toUserRecord(user: UserEntity): UserRecord {
   return {
     id: user.id.value,
@@ -27,7 +25,7 @@ export function toUserRecord(user: UserEntity): UserRecord {
   };
 }
 
-/** Domain entity -> public DTO (never includes the password hash). */
+/** Never includes the password hash. */
 export function toUserDTO(user: UserEntity): IUserDTO {
   return {
     id: user.id.value,

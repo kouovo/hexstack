@@ -2,17 +2,15 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 import { container, inject, singleton } from "@app/di";
 
-/** The authenticated caller, resolved from the session by the HTTP layer. */
 export interface RequestPrincipal {
   userId: string;
   sessionId: string;
   role: string;
 }
 
-/** Per-request state carried through async calls. */
 export interface RequestContextState {
   requestId: string;
-  /** Remote address of the client, set by the HTTP layer; used as the rate-limit key for anonymous calls. */
+  /** Rate-limit key for anonymous calls. */
   clientAddress?: string;
   principal?: RequestPrincipal;
 }

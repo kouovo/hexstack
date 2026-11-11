@@ -6,7 +6,6 @@ import { QueryVisitor } from "../query-visitor";
 
 type TodoTable = typeof TODO_TABLE;
 
-/** Translates todo specifications into a Kysely WHERE expression (and/or/not come from QueryVisitor). */
 export class TodoQueryVisitor extends QueryVisitor<TodoEntity, Database, TodoTable> implements ITodoSpecVisitor {
   constructor(protected override readonly eb: ExpressionBuilder<Database, TodoTable>) {
     super(eb);

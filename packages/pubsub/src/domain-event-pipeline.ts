@@ -32,15 +32,8 @@ const discardPermanentFailures: Middleware = (next) => async (msg) => {
 };
 
 /**
- * millstream-based durable delivery:
- *
- *   business tx ─INSERT→ millstream_queue_outbox ─relay (SKIP LOCKED, delete on ack)→ BullMQ `<EventType>.<consumer>`
- *   ─BullMQSubscriber (nack = fail) + millstream EventProcessor→ durable subscription handler
- *
- * The relay only moves committed envelopes; each consumer gets its own BullMQ queue, so consumers retry,
- * back off and fail independently with BullMQ attempts/backoff and keep exhausted jobs in its failed set.
- * The BullMQ job id is the event id, so a relay crash between publish and delete does not enqueue twice
- * while the earlier job is retained.
+ * outbox → relay → one BullMQ queue per subscription (`<event>.<subscription>`), so each retries and fails on its own.
+ * The job id is the event id: a relay crash between publish and delete does not enqueue twice.
  */
 export class MillstreamDomainEventPipeline implements DomainEventPipeline {
   private readonly logger = createLogger("domain-event-pipeline");
@@ -107,7 +100,6 @@ export class MillstreamDomainEventPipeline implements DomainEventPipeline {
   }
 }
 
-/** Event name → names of its durable subscriptions (= BullMQ consumer groups). */
 function groupByEvent(subscriptions: readonly EventSubscription[]): Map<string, string[]> {
   const byEvent = new Map<string, string[]>();
   for (const { event, name } of subscriptions) byEvent.set(event.name, [...(byEvent.get(event.name) ?? []), name]);

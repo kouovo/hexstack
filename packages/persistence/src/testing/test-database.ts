@@ -19,11 +19,7 @@ export interface TestDatabase {
   close(): Promise<void>;
 }
 
-/**
- * In-memory Postgres (PGlite) with every migration applied. Tests only — the app runs on real Postgres.
- * PGlite is single-connection, so tests cannot exercise true concurrent transactions; the conditional
- * UPDATE contracts are verified sequentially instead.
- */
+/** PGlite is single-connection: concurrent transactions cannot be tested, conditional UPDATEs are tested sequentially. */
 export async function createTestDatabase(): Promise<TestDatabase> {
   const pglite = new PGlite();
   await migrate(drizzle(pglite), { migrationsFolder: MIGRATIONS_FOLDER });

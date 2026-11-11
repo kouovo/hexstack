@@ -13,9 +13,8 @@ export const ARGON2_PARAMS = { memory: 16 * 1024, passes: 3, parallelism: 1, tag
 const PHC = /^\$argon2id\$v=19\$m=(\d+),t=(\d+),p=(\d+)\$([A-Za-z0-9+/]+)\$([A-Za-z0-9+/]+)$/;
 
 /**
- * node:crypto's argon2 runs on the libuv threadpool (UV_THREADPOOL_SIZE, default 4), so hashing never blocks
- * the event loop. The threadpool bounds concurrent hash work; rate limits bound accepted requests.
- * Output is a PHC string, so parameters can change later without breaking stored hashes.
+ * Runs on the libuv threadpool, so hashing never blocks the event loop. PHC output lets parameters change later
+ * without breaking stored hashes.
  */
 @singleton()
 export class Argon2PasswordHasher implements PasswordHasher {

@@ -9,9 +9,7 @@ import { KeyvIoredisStore } from "./keyv-ioredis.store";
 import { InMemoryLockAdapter, RedisLockAdapter } from "./lock.adapter";
 import { InMemoryVersionStore, RedisVersionStore } from "./version.store";
 
-/**
- * Binds LOCK (general-purpose Redis lock on the shared client) and CACHE. Needs registerRedis().
- */
+/** Needs registerRedis(). */
 export function registerCache(): void {
   container.register(LOCK, {
     useFactory: instanceCachingFactory(() => new RedisLockAdapter(container.resolve<Redis>(REDIS_CLIENT))),
@@ -22,12 +20,11 @@ export function registerCache(): void {
       const namespace = env.CACHE_NAMESPACE;
 
       if (env.CACHE_DRIVER === "memory") {
-        // Process-local: replicas do not share entries or invalidations. Development/single-instance only.
+        // Replicas share no entries or invalidations: development/single instance only.
         return new KeyvCacheAdapter(new Keyv({ namespace }), new InMemoryVersionStore(), new InMemoryLockAdapter());
       }
 
-      // A dedicated connection with short deadlines: cache outages degrade to misses instead of
-      // inheriting the queue/auth retry policy and stalling requests.
+      // Own connection with short deadlines, so a cache outage degrades to misses instead of stalling requests.
       const redis = createRedisClient({
         ...getRedisOptions(),
         lazyConnect: true,

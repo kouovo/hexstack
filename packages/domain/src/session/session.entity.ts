@@ -19,17 +19,14 @@ export class SessionId extends IdentifierValue {
 
 export interface ISessionState extends IEntityState<SessionId> {
   userId: UserId;
-  /** SHA-256 of the session secret, hex. The secret itself is only ever held by the client. */
+  /** SHA-256 (hex); only the client ever holds the secret. */
   secretHash: string;
   expiresAt: Date;
   refreshedAt: Date;
   createdAt: Date;
 }
 
-/**
- * Server-side auth session. One session per successful sign-in; never re-used across sign-ins.
- * Token generation/hashing lives in the application layer (session-token.ts).
- */
+/** One per sign-in, never re-used. */
 export class SessionEntity extends AggregateRoot<ISessionState> {
   get userId(): UserId {
     return this.state.userId;
@@ -71,7 +68,7 @@ export class SessionEntity extends AggregateRoot<ISessionState> {
     return now.getTime() >= this.state.expiresAt.getTime();
   }
 
-  /** Slides the expiry forward if the last refresh is older than SESSION_REFRESH_INTERVAL_MS. Returns true if changed. */
+  /** True if the expiry moved. */
   refreshIfDue(now = new Date()): boolean {
     if (now.getTime() - this.state.refreshedAt.getTime() < SESSION_REFRESH_INTERVAL_MS) return false;
     this.state.refreshedAt = now;

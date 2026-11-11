@@ -6,11 +6,7 @@ import { RateLimiterUnavailableError } from "@app/domain";
 import { createLogger } from "@app/logger";
 import { type Redis, injectRedisClient } from "@app/redis";
 
-/**
- * Token bucket, atomic in one Lua call so concurrent requests on any replica cannot over-spend.
- * State: hash {tokens, ts}. One token refills per interval, capped at capacity.
- * Time comes from Redis (TIME) so replicas with skewed clocks agree.
- */
+/** One Lua call, so concurrent replicas cannot over-spend; Redis TIME, so skewed clocks agree. */
 const TOKEN_BUCKET = `
 local key = KEYS[1]
 local capacity = tonumber(ARGV[1])
