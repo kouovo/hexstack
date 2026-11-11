@@ -2,7 +2,7 @@ import { container } from "@app/di";
 import { TodoArchivedEvent, TodoCompletedEvent, TodoCreatedEvent, type TodoEntity, type TodoSpecification } from "@app/domain";
 import { describe, expect, test, vi } from "vitest";
 
-import { InProcessEventBus } from "../../events/in-process-event-bus";
+import { createInProcessEventBus } from "../../events/in-process-event-bus";
 import { IN_PROCESS_EVENT_SUBSCRIPTIONS } from "../../events/subscriptions";
 import { DomainEventScope } from "../../shared/domain-event-scope";
 import type { ApplicationTransactionPort } from "../../transaction";
@@ -42,7 +42,7 @@ function setup() {
   };
   // The real millstream in-process bus, with the app's logging subscriptions.
   const logging = IN_PROCESS_EVENT_SUBSCRIPTIONS.filter(({ name }) => name.endsWith(".log"));
-  const bus = new InProcessEventBus(logging, (handler) => container.resolve(handler));
+  const { bus } = createInProcessEventBus(logging, (handler) => container.resolve(handler));
   const scope = new DomainEventScope(transaction, outbox, bus);
 
   return {
