@@ -1,9 +1,10 @@
 import { CACHE, LOCK } from "@app/application";
 import { container, instanceCachingFactory } from "@app/di";
 import { env } from "@app/env";
-import { REDIS_CLIENT, type Redis, createRedisClient, getRedisOptions } from "@app/redis";
+import { REDIS_CLIENT, type Redis, getRedisOptions } from "@app/redis";
 import Keyv from "keyv";
 
+import { createCacheRedisClient } from "./cache-redis-client";
 import { KeyvCacheAdapter } from "./keyv-cache.adapter";
 import { KeyvIoredisStore } from "./keyv-ioredis.store";
 import { InMemoryLockAdapter, RedisLockAdapter } from "./lock.adapter";
@@ -24,15 +25,7 @@ export function registerCache(): void {
         return new KeyvCacheAdapter(new Keyv({ namespace }), new InMemoryVersionStore(), new InMemoryLockAdapter());
       }
 
-      // Own connection with short deadlines, so a cache outage degrades to misses instead of stalling requests.
-      const redis = createRedisClient({
-        ...getRedisOptions(),
-        lazyConnect: true,
-        enableOfflineQueue: false,
-        maxRetriesPerRequest: 0,
-        connectTimeout: 1_000,
-        commandTimeout: 250,
-      });
+      const redis = createCacheRedisClient(getRedisOptions());
       const store = new KeyvIoredisStore(redis);
       return new KeyvCacheAdapter(new Keyv({ store, namespace }), new RedisVersionStore(redis, namespace), new RedisLockAdapter(redis));
     }),
