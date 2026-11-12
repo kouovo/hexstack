@@ -4,7 +4,7 @@ import { expect, test, vi } from "vitest";
 
 import { createInProcessEventBus } from "./in-process-event-bus";
 import { type EventHandler, subscribe } from "./subscription";
-import { DURABLE_EVENT_SUBSCRIPTIONS, IN_PROCESS_EVENT_SUBSCRIPTIONS } from "./subscriptions";
+import { IN_PROCESS_EVENT_SUBSCRIPTIONS, OUTBOX_SUBSCRIPTIONS } from "./subscriptions";
 
 const ThingHappened = defineEvent("test.thing-happened.v1", z.object({ id: z.string(), at: z.coerce.date<Date>() }));
 const OtherThing = defineEvent("test.other-thing.v1", z.object({ id: z.string() }));
@@ -123,12 +123,11 @@ test("after close, publishing rejects and delivers nothing", async () => {
   expect(s.onThing.handle).not.toHaveBeenCalled();
 });
 
-test("subscription names are unique, and durable ones are valid consumer identities", () => {
-  for (const list of [IN_PROCESS_EVENT_SUBSCRIPTIONS, DURABLE_EVENT_SUBSCRIPTIONS]) {
-    const names = list.map(({ name }) => name);
+test("subscription names are unique", () => {
+  for (const subscriptions of [IN_PROCESS_EVENT_SUBSCRIPTIONS, OUTBOX_SUBSCRIPTIONS]) {
+    const names = subscriptions.map(({ name }) => name);
     expect(new Set(names).size).toBe(names.length);
   }
-  for (const { name } of DURABLE_EVENT_SUBSCRIPTIONS) expect(name).not.toContain(":");
 });
 
 test("handlers do not inherit the async context of whoever built the bus or published", async () => {

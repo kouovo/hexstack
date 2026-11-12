@@ -4,7 +4,6 @@ import { createLogger } from "@app/logger";
 
 import type { EventHandler, EventMeta } from "../../events/subscription";
 
-/** Best effort: anything that must happen belongs in a durable subscription (see ../todo-outbox-handlers.ts). */
 @singleton()
 export class TodoCreatedLogEventHandler implements EventHandler<TodoCreatedEvent> {
   private readonly logger = createLogger(TodoCreatedLogEventHandler.name);

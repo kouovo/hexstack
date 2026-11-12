@@ -58,7 +58,7 @@ export const serverEnvSchema = {
   DB_HEAVY_STATEMENT_TIMEOUT_MS: z.coerce.number().int().nonnegative().default(120_000),
   /** How often (ms) the relay polls the millstream outbox when it is empty. */
   OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1_000),
-  /** BullMQ execution policy (attempts, exponential backoff) for each durable consumer's queue. */
+  /** BullMQ execution policy (attempts, exponential backoff) for each job the relay enqueues. */
   DOMAIN_EVENT_JOB_ATTEMPTS: z.coerce.number().int().positive().default(10),
   DOMAIN_EVENT_JOB_BACKOFF_MS: z.coerce.number().int().positive().default(1_000),
 };

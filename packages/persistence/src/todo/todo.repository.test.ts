@@ -2,7 +2,7 @@ import {
   ArchiveTodoCommandHandler,
   CompleteTodoCommandHandler,
   CreateTodoCommandHandler,
-  NotifyTodoCompletedJobHandler,
+  NotifyTodoCompletedEventHandler,
   DomainEventScope,
   type DomainEventPublisher,
   toTodoRecord,
@@ -138,7 +138,7 @@ test("markCompletionNotified succeeds once, and only for completed todos", async
 test("complete commits the todo row and its outbox row together", async () => {
   const { create, complete } = handlers();
   const created = await create.execute({ title: "end to end" });
-  // TodoCreatedEvent has no durable consumer, so it is not stored.
+  // TodoCreatedEvent has no outbox subscription, so it is not stored.
   expect(await pending()).toEqual([]);
 
   await complete.execute({ todoId: created.id });
@@ -147,7 +147,7 @@ test("complete commits the todo row and its outbox row together", async () => {
   expect(entry!.event).toEqual({ todoId: created.id, completedAt: expect.any(String) });
 });
 
-test("archive persists the status but writes no outbox row (no durable consumer)", async () => {
+test("archive persists the status but writes no outbox row (no outbox subscription)", async () => {
   const { create, archive } = handlers();
   const created = await create.execute({ title: "archive me" });
   await archive.execute({ todoId: created.id });
@@ -168,12 +168,12 @@ test("a failing outbox insert rolls back the status change", async () => {
   expect((await repo.findOne(new TodoIdSpecification(TodoId.create(created.id))))?.status.value).toBe("open");
 });
 
-test("job handler is idempotent against the real table", async () => {
+test("outbox handler is idempotent against the real table", async () => {
   const { create, complete } = handlers();
   const created = await create.execute({ title: "deliver twice" });
   await complete.execute({ todoId: created.id });
 
-  const job = new NotifyTodoCompletedJobHandler(repo, {
+  const notify = new NotifyTodoCompletedEventHandler(repo, {
     get: async () => undefined,
     set: async () => {},
     delete: async () => {},
@@ -181,9 +181,9 @@ test("job handler is idempotent against the real table", async () => {
     getOrSet: (_key, load) => load(),
     getOrSetVersioned: (_namespace, load) => load(),
   });
-  await job.process({ todoId: created.id });
+  await notify.handle({ todoId: created.id, completedAt: new Date() });
   const first = (await repo.findOne(new TodoIdSpecification(TodoId.create(created.id))))?.completionNotifiedAt;
-  await job.process({ todoId: created.id });
+  await notify.handle({ todoId: created.id, completedAt: new Date() });
   const second = (await repo.findOne(new TodoIdSpecification(TodoId.create(created.id))))?.completionNotifiedAt;
 
   expect(first).toBeInstanceOf(Date);
