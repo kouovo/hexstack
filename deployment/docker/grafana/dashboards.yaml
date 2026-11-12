@@ -1,0 +1,13 @@
+# Grafana dashboard provisioning for the local otel-lgtm container (see ../compose.yaml).
+# Files in ./dashboards are loaded into the "App" folder and re-read every 10 s. They are read-only in the UI:
+# to change a dashboard, edit the JSON here, or edit in the UI and use Export → "Export as JSON" to overwrite the file.
+apiVersion: 1
+providers:
+  - name: app
+    folder: App
+    type: file
+    allowUiUpdates: false
+    updateIntervalSeconds: 10
+    options:
+      path: /var/lib/grafana-dashboards/app
+      foldersFromFilesStructure: false

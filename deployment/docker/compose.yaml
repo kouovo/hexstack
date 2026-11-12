@@ -68,9 +68,25 @@ services:
         mc mb --ignore-existing --region "$$STORAGE_MINIO_REGION" "local/$$STORAGE_BUCKET"
         mc anonymous set none "local/$$STORAGE_BUCKET"
 
+  # Optional local OpenTelemetry backend (Collector + Tempo + Prometheus + Loki + Grafana in one image).
+  # `pnpm infra:otel`, then set OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318. Grafana: http://localhost:3300.
+  otel-lgtm:
+    image: grafana/otel-lgtm:0.40.0
+    profiles: [observability]
+    ports:
+      - "127.0.0.1:3300:3000" # Grafana (web already uses 3000)
+      - "127.0.0.1:4317:4317" # OTLP gRPC
+      - "127.0.0.1:4318:4318" # OTLP HTTP
+    volumes:
+      - otel-lgtm-data:/data
+      # Project dashboards (Dashboards → App → "API overview"), versioned in ./grafana/dashboards.
+      - ./grafana/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/app.yaml:ro
+      - ./grafana/dashboards:/var/lib/grafana-dashboards/app:ro
+
 volumes:
   postgres-data:
   minio-data:
+  otel-lgtm-data:
 
 networks:
   default:

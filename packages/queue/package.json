@@ -15,7 +15,8 @@
     "@app/di": "workspace:*",
     "@app/logger": "workspace:*",
     "@app/redis": "workspace:*",
-    "bullmq": "^5.16.0"
+    "bullmq": "^5.16.0",
+    "bullmq-otel": "~1.3.1"
   },
   "devDependencies": {
     "@app/typescript-config": "workspace:*",

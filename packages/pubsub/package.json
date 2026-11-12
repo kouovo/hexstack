@@ -19,6 +19,7 @@
     "@millstream/core": "^0.5.0",
     "@millstream/cqrs": "^0.5.0",
     "@millstream/forwarder": "^0.5.0",
+    "@millstream/otel": "^0.5.0",
     "@millstream/pg": "^0.5.0"
   },
   "devDependencies": {

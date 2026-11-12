@@ -5,6 +5,7 @@ import { createMillstreamDriver, type ISqlQueryBuilder, OUTBOX_TOPIC } from "@ap
 import { CORRELATION_ID, recoverer, Router } from "@millstream/core";
 import { jsonEventMarshaler } from "@millstream/cqrs";
 import { addForwarder } from "@millstream/forwarder";
+import { otelMiddleware } from "@millstream/otel";
 import { PgQueueSubscriber } from "@millstream/pg";
 
 /**
@@ -39,6 +40,7 @@ export class MillstreamDomainEventPipeline implements DomainEventPipeline {
       handlerName: "outbox-relay",
       forwarderTopic: OUTBOX_TOPIC,
       subscriber: outbox,
+      middlewares: [otelMiddleware({ system: "postgresql" })],
       publisher: {
         publish: async (topic, ...messages) => {
           const jobs = jobsOf.get(topic);
