@@ -12,7 +12,6 @@ export interface EventHandler<TPayload> {
 
 export interface EventSubscription<E extends AnyEventDefinition = AnyEventDefinition> {
   readonly event: E;
-  /** Durable subscriptions: names the BullMQ queue (`<event name>.<name>`), so keep it stable and without ":". */
   readonly name: string;
   readonly handler: new (...args: any[]) => EventHandler<EventPayload<E>>;
 }

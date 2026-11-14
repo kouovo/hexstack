@@ -14,9 +14,8 @@ import { DomainEventScope } from "../shared/domain-event-scope";
 import type { ApplicationTransactionPort } from "../transaction";
 import { CompleteTodoCommandHandler } from "./commands/complete-todo.command";
 import { CreateTodoCommandHandler } from "./commands/create-todo.command";
-import { NOTIFY_TODO_COMPLETED_JOB_NAME, NotifyTodoCompletedJobHandler } from "./jobs/notify-todo-completed.job";
+import { NotifyTodoCompletedEventHandler } from "./events/notify-todo-completed-event.handler";
 import { ListTodosQueryHandler } from "./queries/list-todos.query";
-import { DispatchTodoCompletedOutboxHandler } from "./todo-outbox-handlers";
 import type { ITodoRepository } from "./todo.repository.port";
 
 /** Same conditional-update contract as the SQL adapter; `status`/`notified` model the stored columns. */
@@ -158,22 +157,7 @@ describe("list query", () => {
 });
 
 describe("todo async flow", () => {
-  test("outbox handler enqueues with a deterministic jobId", async () => {
-    const dispatcher = { enqueue: vi.fn(async () => {}), registerJob: vi.fn(), scheduleRepeat: vi.fn(), unscheduleRepeat: vi.fn() };
-    const event = { todoId: "todo_1", completedAt: new Date() };
-    const handler = new DispatchTodoCompletedOutboxHandler(dispatcher);
-    await handler.handle(event);
-    await handler.handle(event);
-    expect(dispatcher.enqueue).toHaveBeenNthCalledWith(
-      1,
-      NOTIFY_TODO_COMPLETED_JOB_NAME,
-      { todoId: "todo_1" },
-      expect.objectContaining({ jobId: "todo-completed__todo_1" }),
-    );
-    expect(dispatcher.enqueue.mock.calls[1]).toEqual(dispatcher.enqueue.mock.calls[0]);
-  });
-
-  test("job handler is idempotent: a redelivered job does not notify twice", async () => {
+  test("outbox handler is idempotent: a redelivered job does not notify twice", async () => {
     const repo = new InMemoryTodoRepository();
     const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create("x")));
     await repo.insert(todo);
@@ -181,9 +165,10 @@ describe("todo async flow", () => {
     await repo.updateIfStatus(todo, "open");
     const spy = vi.spyOn(repo, "markCompletionNotified");
 
-    const job = new NotifyTodoCompletedJobHandler(repo, uncached());
-    await job.process({ todoId: todo.id.value });
-    await job.process({ todoId: todo.id.value });
+    const handler = new NotifyTodoCompletedEventHandler(repo, uncached());
+    const event = { todoId: todo.id.value, completedAt: new Date() };
+    await handler.handle(event);
+    await handler.handle(event);
 
     expect(await Promise.all(spy.mock.results.map((r) => r.value))).toEqual([true, false]);
   });

@@ -1,8 +1,12 @@
 import { TodoArchivedEvent, TodoCompletedEvent, TodoCreatedEvent, UserRoleChangedEvent } from "@app/domain";
 
-import { TodoArchivedLogEventHandler, TodoCompletedLogEventHandler, TodoCreatedLogEventHandler } from "../todo/events";
+import {
+  NotifyTodoCompletedEventHandler,
+  TodoArchivedLogEventHandler,
+  TodoCompletedLogEventHandler,
+  TodoCreatedLogEventHandler,
+} from "../todo/events";
 import { TodoListCacheInvalidationHandler } from "../todo/todo-cache-invalidation";
-import { DispatchTodoCompletedOutboxHandler } from "../todo/todo-outbox-handlers";
 import { UserRoleChangedLogEventHandler } from "../user/events";
 import { type EventSubscription, subscribe } from "./subscription";
 
@@ -17,9 +21,12 @@ export const IN_PROCESS_EVENT_SUBSCRIPTIONS: readonly EventSubscription[] = [
   ),
 ];
 
-/** At-least-once. Only events listed here are written to the outbox. */
-export const DURABLE_EVENT_SUBSCRIPTIONS: readonly EventSubscription[] = [
-  subscribe(TodoCompletedEvent, "todo.dispatch-completion-notification", DispatchTodoCompletedOutboxHandler),
+/**
+ * At-least-once, so handlers must be idempotent. Only events listed here are persisted.
+ * The name is the BullMQ queue name: keep it stable.
+ */
+export const OUTBOX_SUBSCRIPTIONS: readonly EventSubscription[] = [
+  subscribe(TodoCompletedEvent, "todo.notify-completed", NotifyTodoCompletedEventHandler),
 ];
 
-export const DURABLE_EVENT_NAMES: ReadonlySet<string> = new Set(DURABLE_EVENT_SUBSCRIPTIONS.map(({ event }) => event.name));
+export const OUTBOX_EVENT_NAMES: ReadonlySet<string> = new Set(OUTBOX_SUBSCRIPTIONS.map(({ event }) => event.name));

@@ -55,7 +55,7 @@ test("durable events go to the outbox inside the transaction; all events are bro
   });
 
   expect(result).toBe("done");
-  // Only TodoCompletedEvent has a durable subscription, so only it is written to the outbox.
+  // Only TodoCompletedEvent has an outbox subscription, so only it is written to the outbox.
   expect(s.log).toEqual(["outbox:completed_b", "commit", "bus:created_a,completed_b"]);
   expect(a.clearDomainEvents()).toEqual([]);
 });

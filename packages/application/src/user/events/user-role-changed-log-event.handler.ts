@@ -4,7 +4,6 @@ import { createLogger } from "@app/logger";
 
 import type { EventHandler, EventMeta } from "../../events/subscription";
 
-/** In-process audit trail for role changes. Make it a durable subscription if the audit log must be durable. */
 @singleton()
 export class UserRoleChangedLogEventHandler implements EventHandler<UserRoleChangedEvent> {
   private readonly logger = createLogger(UserRoleChangedLogEventHandler.name);

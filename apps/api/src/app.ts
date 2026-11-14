@@ -1,5 +1,6 @@
 import { env } from "@app/env";
 import { HTTP_STATUS, isKnownError, toPublicError, type PublicError } from "@app/rpc";
+import { httpInstrumentationMiddleware } from "@hono/otel";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
@@ -11,6 +12,7 @@ import { appLogger } from "./middlewares/logger";
 import { requestContext } from "./middlewares/request-context";
 import { rpc } from "./middlewares/rpc";
 import { listTodos } from "./routes/todos";
+import { SERVICE_NAME, SERVICE_VERSION } from "./service-info";
 
 export type CreateAppOptions = {
   /** Browser origins allowed to call the API with cookies (CORS + CSRF). Defaults to CORS_ORIGINS. */
@@ -21,6 +23,19 @@ export type CreateAppOptions = {
 export function createApp({ trustedOrigins = env.CORS_ORIGINS }: CreateAppOptions = {}) {
   const app = new Hono();
 
+  // First, so the server span covers CORS/auth too. A no-op unless the SDK was started (see telemetry.ts).
+  app.use(
+    "*",
+    httpInstrumentationMiddleware({
+      serviceName: SERVICE_NAME,
+      serviceVersion: SERVICE_VERSION,
+      // Query strings may carry tokens: keep them out of the tracing backend.
+      getUrlFull: (c) => {
+        const url = new URL(c.req.url);
+        return `${url.origin}${url.pathname}`;
+      },
+    }),
+  );
   app.use(
     "*",
     cors({

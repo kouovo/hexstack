@@ -2,6 +2,7 @@ import { createLogger } from "@app/logger";
 import { type Dialect, Kysely, ParseJSONResultsPlugin } from "kysely";
 
 import type { Database } from "./db";
+import { recordQuery } from "./db.telemetry";
 
 export function createKyselyQueryBuilder(dialect: Dialect) {
   const logger = createLogger("database");
@@ -10,11 +11,10 @@ export function createKyselyQueryBuilder(dialect: Dialect) {
     dialect,
     plugins: [new ParseJSONResultsPlugin()],
     log: (event) => {
+      recordQuery(event);
       if (event.level === "error") {
-        logger.error(
-          { err: event.error, query: event.query.sql, params: event.query.parameters, duration: event.queryDurationMillis },
-          "kysely.error",
-        );
+        // No bound parameters: they can hold emails, password hashes or tokens, and logs leave the process (OTLP).
+        logger.error({ err: event.error, query: event.query.sql, duration: event.queryDurationMillis }, "kysely.error");
       }
     },
   });

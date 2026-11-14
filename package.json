@@ -17,7 +17,8 @@
     "db:migrate": "pnpm --filter cli cli db migrate",
     "db:studio": "pnpm --filter @app/persistence studio",
     "infra:up": "docker compose -f deployment/docker/compose.yaml up -d --wait --wait-timeout 120",
-    "infra:down": "docker compose -f deployment/docker/compose.yaml --profile storage down",
+    "infra:down": "docker compose -f deployment/docker/compose.yaml --profile storage --profile observability down",
+    "infra:otel": "docker compose -f deployment/docker/compose.yaml --profile observability up -d otel-lgtm",
     "prepare": "simple-git-hooks",
     "dev:web": "turbo run dev --filter=web",
     "infra:storage": "docker compose -f deployment/docker/compose.yaml --profile storage run --rm -T object-storage-init"

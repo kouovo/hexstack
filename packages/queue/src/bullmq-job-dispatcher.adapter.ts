@@ -4,6 +4,7 @@ import { singleton } from "@app/di";
 import { createLogger } from "@app/logger";
 import type { RedisOptions } from "@app/redis";
 import { type ConnectionOptions, type JobsOptions, Queue, UnrecoverableError, Worker } from "bullmq";
+import { BullMQOtel } from "bullmq-otel";
 
 import { toBullmqJobId } from "./bullmq-job-id";
 
@@ -17,6 +18,12 @@ export class BullMQJobDispatcher implements JobDispatcher {
   private readonly logger = createLogger(BullMQJobDispatcher.name);
   private readonly queues = new Map<string, Queue>();
   private readonly workers = new Map<string, Worker>();
+  /**
+   * BullMQ's own OpenTelemetry hooks: a producer span on `add` whose context travels with the job, and a consumer span
+   * around the processor, so a job is part of the trace that enqueued it (logs and SQL inside the handler included).
+   * No-ops without an OTel SDK. millstream's queues are traced by `@millstream/otel` instead.
+   */
+  private readonly telemetry = new BullMQOtel({ tracerName: "@app/queue", meterName: "@app/queue", enableMetrics: true });
 
   constructor(
     private readonly connection: RedisOptions,
@@ -71,6 +78,7 @@ export class BullMQJobDispatcher implements JobDispatcher {
       {
         connection: this.connection as unknown as ConnectionOptions,
         concurrency: opts?.concurrency ?? 1,
+        telemetry: this.telemetry,
       },
     );
     worker.on("failed", (job, err) => {
@@ -106,6 +114,7 @@ export class BullMQJobDispatcher implements JobDispatcher {
         // Producers must fail when Redis is unavailable instead of buffering indefinitely.
         // In particular, the outbox relay holds database row locks until enqueue settles.
         connection: { ...this.connection, enableOfflineQueue: false, maxRetriesPerRequest: 1 } as unknown as ConnectionOptions,
+        telemetry: this.telemetry,
       });
       this.queues.set(name, queue);
     }

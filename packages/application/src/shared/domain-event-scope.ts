@@ -5,7 +5,7 @@ import { createLogger } from "@app/logger";
 import type { EventItem } from "@millstream/cqrs";
 
 import { DOMAIN_EVENT_BUS, DOMAIN_EVENT_OUTBOX, type DomainEventPublisher } from "../events/port";
-import { DURABLE_EVENT_NAMES } from "../events/subscriptions";
+import { OUTBOX_EVENT_NAMES } from "../events/subscriptions";
 import { type ApplicationTransactionOptions, type ApplicationTransactionPort, injectApplicationTransaction } from "../transaction";
 
 export interface DomainEventSource {
@@ -45,7 +45,7 @@ export class DomainEventScope {
       const result = await this.active.run(tracked, () => work((...sources) => sources.forEach((source) => tracked.add(source))));
       // Collected after the work, so events recorded after track() are included.
       const events = [...tracked].flatMap((source) => source.clearDomainEvents());
-      const durable = events.filter(({ event }) => DURABLE_EVENT_NAMES.has(event.name));
+      const durable = events.filter(({ event }) => OUTBOX_EVENT_NAMES.has(event.name));
       if (durable.length) await this.outbox.publishMany(durable);
       return { result, events };
     }, options);

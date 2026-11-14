@@ -1,3 +1,6 @@
+// Keep first: the OpenTelemetry SDK must own the global providers before any app module loads.
+// Side-effect import on purpose: import sorting never moves those.
+import "./telemetry";
 import "reflect-metadata";
 import { DOMAIN_EVENT_PIPELINE, type DomainEventPipeline } from "@app/application";
 import { registerDI } from "@app/bootstrap";
@@ -9,6 +12,7 @@ import pkg from "../package.json";
 import { createApp } from "./app";
 import { startMaintenanceScheduler } from "./middlewares/cron";
 import { appLogger } from "./middlewares/logger";
+import { shutdownTelemetry } from "./telemetry";
 
 registerDI();
 
@@ -36,6 +40,7 @@ const shutdown = (signal: NodeJS.Signals) => {
   void domainEvents
     .close()
     .catch((error: unknown) => appLogger.error({ err: error }, "domain-event pipeline close failed"))
+    .then(() => shutdownTelemetry())
     .finally(() => process.exit(0));
 };
 process.once("SIGTERM", shutdown);

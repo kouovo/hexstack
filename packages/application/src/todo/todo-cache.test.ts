@@ -9,7 +9,7 @@ import type { ApplicationTransactionPort } from "../transaction";
 import { ArchiveTodoCommandHandler } from "./commands/archive-todo.command";
 import { CompleteTodoCommandHandler } from "./commands/complete-todo.command";
 import { CreateTodoCommandHandler } from "./commands/create-todo.command";
-import { NotifyTodoCompletedJobHandler } from "./jobs/notify-todo-completed.job";
+import { NotifyTodoCompletedEventHandler } from "./events/notify-todo-completed-event.handler";
 import { ListTodosQueryHandler } from "./queries/list-todos.query";
 import { TODO_LIST_CACHE_NAMESPACE, TodoListCacheInvalidationHandler } from "./todo-cache-invalidation";
 import { todoListQueryKey } from "./todo-list-cache-key";
@@ -62,7 +62,7 @@ function setup() {
     complete: new CompleteTodoCommandHandler(repo, scope),
     archive: new ArchiveTodoCommandHandler(repo, scope),
     list: new ListTodosQueryHandler(repo, cache),
-    job: new NotifyTodoCompletedJobHandler(repo, cache),
+    notify: new NotifyTodoCompletedEventHandler(repo, cache),
   };
 }
 
@@ -128,7 +128,8 @@ test("list query keys are stable and distinguish every input", () => {
 
 test("the background notification write invalidates; duplicate delivery does not", async () => {
   const s = setup();
-  await s.job.process({ todoId: "todo_example" });
-  await s.job.process({ todoId: "todo_example" });
+  const event = { todoId: "todo_example", completedAt: new Date() };
+  await s.notify.handle(event);
+  await s.notify.handle(event);
   expect(s.invalidate).toHaveBeenCalledExactlyOnceWith(TODO_LIST_CACHE_NAMESPACE);
 });

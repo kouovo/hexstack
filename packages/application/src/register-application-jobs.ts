@@ -1,7 +1,10 @@
-import { registerJobs } from "./queue/register-jobs";
-import { NotifyTodoCompletedJobHandler } from "./todo/jobs/notify-todo-completed.job";
+import { container } from "@app/di";
 
-/** MQ consumers only. This list neither subscribes to events nor configures Outbox. */
+import { registerOutboxWorkers } from "./events/outbox-workers";
+import { OUTBOX_SUBSCRIPTIONS } from "./events/subscriptions";
+import { JOB_DISPATCHER, type JobDispatcher } from "./queue/queue.port";
+
+/** Explicit startup registration; resolving a handler never starts workers by itself. */
 export function registerApplicationJobs(): void {
-  registerJobs([NotifyTodoCompletedJobHandler]);
+  registerOutboxWorkers(OUTBOX_SUBSCRIPTIONS, container.resolve<JobDispatcher>(JOB_DISPATCHER), (handler) => container.resolve(handler));
 }

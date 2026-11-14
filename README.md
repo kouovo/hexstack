@@ -36,7 +36,7 @@ Authentication guidance also draws on [Pilcrow's Auth Book](https://auth.pilcrow
   - [Domain policies and services](#domain-policies-and-services)
   - [Errors](#errors)
 - [Events and reliable delivery](#events-and-reliable-delivery)
-  - [In-process and durable handlers](#in-process-and-durable-handlers)
+  - [In-process and outbox subscriptions](#in-process-and-outbox-subscriptions)
   - [Example flow: complete a todo](#example-flow-complete-a-todo)
 - [Interface adapters](#interface-adapters)
   - [HTTP and RPC](#http-and-rpc)
@@ -110,22 +110,23 @@ pnpm cli user role you@example.com admin
 There are no seed passwords, automatic first-user promotion, or public admin-bootstrap endpoints.
 The role command uses the configured Postgres and Redis.
 
-| Command                                       | Purpose                                                                                 |
-| --------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `pnpm dev`                                    | Start and wait for infrastructure, migrate, then run API and web together               |
-| `pnpm dev:api` / `pnpm dev:web`               | Start one app against existing infrastructure                                           |
-| `pnpm infra:up`                               | Start local Postgres and Redis and wait for health checks                               |
-| `pnpm build`                                  | Bundle API and CLI with tsup; build the web app with Next.js                            |
-| `pnpm test`                                   | Run Vitest; persistence tests use real migrations on PGlite, without Docker             |
-| `pnpm check-types`                            | Type-check workspace packages and apps                                                  |
-| `pnpm lint` / `pnpm format:check`             | Check code with oxlint / oxfmt                                                          |
-| `pnpm format`                                 | Format TypeScript, JavaScript, CSS, and JSON                                            |
-| `pnpm db:generate --name <change>`            | Generate a migration from the Drizzle schema                                            |
-| `pnpm db:migrate`                             | Apply pending migrations under a Postgres advisory lock                                 |
-| `pnpm db:studio`                              | Open Drizzle Studio against the configured database                                     |
-| `pnpm infra:storage`                          | Start MinIO, wait for readiness, and create a private bucket (API :9000, console :9001) |
-| `pnpm cli storage <put/get/head/delete/sign>` | Exercise the object-storage port without a public file API                              |
-| `pnpm infra:down`                             | Stop the local infrastructure                                                           |
+| Command                                       | Purpose                                                                                  |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `pnpm dev`                                    | Start and wait for infrastructure, migrate, then run API and web together                |
+| `pnpm dev:api` / `pnpm dev:web`               | Start one app against existing infrastructure                                            |
+| `pnpm infra:up`                               | Start local Postgres and Redis and wait for health checks                                |
+| `pnpm build`                                  | Bundle API and CLI with tsup; build the web app with Next.js                             |
+| `pnpm test`                                   | Run Vitest; persistence tests use real migrations on PGlite, without Docker              |
+| `pnpm check-types`                            | Type-check workspace packages and apps                                                   |
+| `pnpm lint` / `pnpm format:check`             | Check code with oxlint / oxfmt                                                           |
+| `pnpm format`                                 | Format TypeScript, JavaScript, CSS, and JSON                                             |
+| `pnpm db:generate --name <change>`            | Generate a migration from the Drizzle schema                                             |
+| `pnpm db:migrate`                             | Apply pending migrations under a Postgres advisory lock                                  |
+| `pnpm db:studio`                              | Open Drizzle Studio against the configured database                                      |
+| `pnpm infra:storage`                          | Start MinIO, wait for readiness, and create a private bucket (API :9000, console :9001)  |
+| `pnpm cli storage <put/get/head/delete/sign>` | Exercise the object-storage port without a public file API                               |
+| `pnpm infra:otel`                             | Start a local OpenTelemetry backend (grafana/otel-lgtm; Grafana :3300, OTLP :4317/:4318) |
+| `pnpm infra:down`                             | Stop the local infrastructure                                                            |
 
 Local configuration lives in [.env.example](.env.example). Do not commit real credentials or copy its
 plain-HTTP cookie setting into production; see [Deployment rules](#deployment-rules).
@@ -261,7 +262,7 @@ packages/
   env/                  validated runtime environment
   redis/                Redis client/configuration
   queue/                BullMQ JobDispatcher
-  pubsub/               millstream router: outbox relay to BullMQ and durable handler dispatch
+  pubsub/               millstream router: outbox relay: event → BullMQ jobs
   typescript-config/    shared TypeScript configuration
 ```
 
@@ -562,41 +563,41 @@ export type TodoCompletedEvent = EventPayload<typeof TodoCompletedEvent>; // { t
 Entities record events with `this.addDomainEvent(TodoCompletedEvent, { todoId, completedAt })`; the event id (the
 message uuid on every transport) is fixed at that moment. Application code decides when to persist and publish them.
 Payloads are validated against the schema when published and again when consumed, and cross every boundary as JSON:
-the schema turns them back into typed values (`z.coerce.date()` restores `Date`s), and an invalid payload on the wire is
-a permanent failure, never retried.
+the schema turns them back into typed values (`z.coerce.date()` restores `Date`s). An invalid payload is dropped in
+process; an outbox job fails with it and is retried like any other error until it lands in the failed set.
 
-### In-process and durable handlers
+### In-process and outbox subscriptions
 
-Handlers are plain DI classes implementing `EventHandler<Payload>` (`handle(event, meta)`, where `meta.id` is the event
-id). Every subscription is one line in [events/subscriptions.ts](packages/application/src/events/subscriptions.ts):
+Every event handler implements `EventHandler<Payload>` (`handle(event, meta)`, `meta.id` is the event id) and is
+subscribed with `subscribe(event, name, Handler)`. The list it is in, in
+[events/subscriptions.ts](packages/application/src/events/subscriptions.ts), decides how it is delivered:
 
 ```ts
 export const IN_PROCESS_EVENT_SUBSCRIPTIONS = [
   subscribe(TodoCreatedEvent, "todo.created.log", TodoCreatedLogEventHandler),
   // …
 ];
-export const DURABLE_EVENT_SUBSCRIPTIONS = [
-  subscribe(TodoCompletedEvent, "todo.dispatch-completion-notification", DispatchTodoCompletedOutboxHandler),
-];
+export const OUTBOX_SUBSCRIPTIONS = [subscribe(TodoCompletedEvent, "todo.notify-completed", NotifyTodoCompletedEventHandler)];
 ```
 
-There are two deliberately different mechanisms, both run by millstream's `EventBus` / `EventProcessor`:
+|              | In-process                                                                                                                                                                                          | Outbox                                                                                                                                                                                                                |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Example      | [Todo logging handlers](packages/application/src/todo/events), [list-cache invalidation](packages/application/src/todo/todo-cache-invalidation.ts)                                                  | [NotifyTodoCompletedEventHandler](packages/application/src/todo/events/notify-todo-completed-event.handler.ts)                                                                                                        |
+| Execution    | After commit, in the same process: a millstream `EventBus` from [createInProcessEventBus](packages/application/src/events/in-process-event-bus.ts) (`MemoryPubSub` + `dropOnError`, fully parallel) | The relay enqueues one BullMQ job per subscription (queue = subscription name, job id `<name>__<event id>`); [the worker](packages/application/src/events/outbox-workers.ts) parses the payload with the event schema |
+| Guarantee    | Best-effort; failures cannot fail a committed command; process death can lose delivery                                                                                                              | At-least-once, so the handler must be idempotent; BullMQ owns attempts, backoff and failed-job retention                                                                                                              |
+| Suitable for | Non-critical logging, cache invalidation, broadcasts                                                                                                                                                | Side effects that must happen                                                                                                                                                                                         |
 
-|              | In-process                                                                                                                                                                                          | Durable                                                                                                          |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Example      | [Todo logging handlers](packages/application/src/todo/events), [list-cache invalidation](packages/application/src/todo/todo-cache-invalidation.ts)                                                  | [DispatchTodoCompletedOutboxHandler](packages/application/src/todo/todo-outbox-handlers.ts)                      |
-| Execution    | After commit, in the same process: a millstream `EventBus` from [createInProcessEventBus](packages/application/src/events/in-process-event-bus.ts) (`MemoryPubSub` + `dropOnError`, fully parallel) | The relay moves the committed envelope to one BullMQ queue per subscription (`<event name>.<subscription name>`) |
-| Guarantee    | Best-effort; failures cannot fail a committed command; process death can lose delivery                                                                                                              | At-least-once; BullMQ owns attempts, backoff and failed-job retention                                            |
-| Suitable for | Non-critical logging, cache invalidation, broadcasts                                                                                                                                                | Side effects that require durable delivery, such as enqueueing a job                                             |
-| Registration | `IN_PROCESS_EVENT_SUBSCRIPTIONS`                                                                                                                                                                    | `DURABLE_EVENT_SUBSCRIPTIONS`                                                                                    |
+Making a handler reliable means moving its line from one list to the other. An outbox subscription's name is its BullMQ
+queue name, so keep it stable.
 
-The outbox stores only events with at least one durable subscription (`DURABLE_EVENT_NAMES`, derived from the list).
-Here that is `TodoCompletedEvent`; creation/archive events have in-process handlers only. Every event is broadcast in
-process, durable ones included.
+Fan-out is one line per target: N `subscribe(...)` for the same event, in either list. Each outbox subscription retries
+and fails on its own. The outbox stores only events with at least one outbox subscription (`OUTBOX_EVENT_NAMES`,
+derived from the list); the relay keeps any event it has no subscription for, so storing the others would block them
+forever. Every event is also broadcast in process.
 
 Unlike a design that runs all domain-event handlers inside a transaction, **these in-process handlers run after commit**.
 Do not put work that must commit atomically with the command in a best-effort handler. Keep it in the transaction,
-or use a durable consumer if eventual consistency is acceptable.
+or use an outbox subscription if eventual consistency is acceptable.
 
 Event names are versioned wire contracts, but they are still internal domain events. If another service must consume
 these facts, define a dedicated integration event and deliver it through a durable adapter rather than exposing the
@@ -612,7 +613,6 @@ sequenceDiagram
   participant Domain as TodoEntity
   participant DB as Postgres
   participant Relay as Outbox relay
-  participant Consumer as Durable consumer
   participant Job as BullMQ worker
 
   Client->>RPC: todo.complete
@@ -625,9 +625,8 @@ sequenceDiagram
   UseCase-->>RPC: Post-commit broadcast, then DTO
   RPC-->>Client: Response
   Relay->>DB: Claim one envelope FOR UPDATE SKIP LOCKED
-  Relay->>Consumer: Add job <eventId> to todo.completed.v1.<subscription>
+  Relay->>Job: Add job todo.notify-completed__<eventId>
   Relay->>DB: DELETE envelope, COMMIT
-  Consumer->>Job: Durable consumer enqueues deterministic job
   Job->>DB: Set notification timestamp conditionally
 ```
 
@@ -641,27 +640,24 @@ sequenceDiagram
 3. After commit, the in-process handlers run best-effort and the caller receives a DTO.
 4. [MillstreamDomainEventPipeline](packages/pubsub/src/domain-event-pipeline.ts) runs a millstream `Router` in every API
    replica. Its relay (`PgQueueSubscriber`, polling every `OUTBOX_POLL_INTERVAL_MS`) claims one committed envelope at a
-   time with `FOR UPDATE SKIP LOCKED`, publishes it with `BullMQPublisher` once per durable subscription of the event
-   (queue `<event name>.<subscription name>`, job id = event id), and deletes the row in the same transaction. If Redis
-   is down, or the event has no durable subscription in this process (a rolling-deploy mismatch), the row stays and is
-   retried; nothing is dropped. No business handler runs in the relay.
-5. Each durable subscription is a millstream `EventProcessor` handler reading its own queue with
-   `BullMQSubscriber({ nack: "fail" })`, so **BullMQ owns retries**:
-   `DOMAIN_EVENT_JOB_ATTEMPTS` with exponential `DOMAIN_EVENT_JOB_BACKOFF_MS`; exhausted jobs remain in that queue's
-   failed set for inspection/retry. One subscription's failure never retries another. Non-retryable `DomainError`s (and
-   payloads that fail the event schema) are discarded straight to the failed set. The failed job's reason is millstream's generic
-   `NackedError`; the real error is in the logs.
-   The todo consumer then enqueues a deterministic `todo-completed__<todoId>` job. BullMQ deduplicates while the original job is retained.
-6. [NotifyTodoCompletedJobHandler](packages/application/src/todo/jobs/notify-todo-completed.job.ts) conditionally writes
-   `completion_notified_at` only for a still-completed todo whose timestamp is null. Redelivery is a no-op once set;
-   a todo archived before the job runs is skipped.
+   time with `FOR UPDATE SKIP LOCKED`, enqueues one job per outbox subscription of the event through `JobDispatcher`
+   (data: event id, correlation id and payload; job id `<name>__<event id>`; `DOMAIN_EVENT_JOB_ATTEMPTS` with
+   exponential `DOMAIN_EVENT_JOB_BACKOFF_MS`), and deletes the row in the same transaction. If Redis is down, or the
+   event has no outbox subscription in this process (a rolling-deploy mismatch), the row stays and is retried; nothing
+   is dropped. No business code runs in the relay.
+5. BullMQ owns retries: one job's failure never retries another, exhausted jobs remain in the failed set, and
+   non-retryable `DomainError`s go straight to it. A relay retry after a partial enqueue is deduplicated by the job id
+   while the original job is retained.
+6. A BullMQ worker parses the payload with the event schema and calls
+   [NotifyTodoCompletedEventHandler](packages/application/src/todo/events/notify-todo-completed-event.handler.ts), which
+   conditionally writes `completion_notified_at` only for a still-completed todo whose timestamp is null. Redelivery is
+   a no-op once set; a todo archived before the job runs is skipped.
 
-Outbox rows exist only until the broker accepted them, so there is no cleanup job. Attempts, failures and manual retries
-live in BullMQ. The message payload is the event payload as JSON; the event name travels in the `name` metadata.
-
-A durable subscription's name is its consumer identity: it names its BullMQ queue, independent of the handler class.
-Names must be unique and must not contain `:` (BullMQ). Renaming a subscription starts a new, empty queue: drain the old
-one first.
+Outbox rows exist only until BullMQ accepted the jobs, so there is no cleanup job. Attempts, failures and manual
+retries live in BullMQ. An outbox subscription's name is its queue name and part of every job id: renaming it starts a
+new, empty queue, so drain the old one first. The job data format (`{ eventId, correlationId, payload }`) is shared by
+the relay and [the workers](packages/application/src/events/outbox-workers.ts); jobs left over from an older format
+fail rather than reach a handler.
 
 Duplicates are still possible: a crash after the BullMQ add but before the outbox commit relays the same event again,
 and BullMQ only deduplicates while the job is retained (1,000 completed / 5,000 failed). Outbox rows are relayed in
@@ -882,8 +878,8 @@ matter and keys stay short. Keep namespaces bounded (one per resource or list), 
 Single-entry caches would `delete(key)` instead. In-process events are published after commit, so a rolled-back write
 never invalidates. A failing invalidation is logged by the bus and does not fail the committed write.
 Writes that publish no in-process event invalidate directly: the
-[notification job](packages/application/src/todo/jobs/notify-todo-completed.job.ts) bumps the namespace after its SQL
-update succeeds.
+[notification handler](packages/application/src/todo/events/notify-todo-completed-event.handler.ts) bumps the namespace
+after its SQL update succeeds.
 
 **Versions.** Each namespace has one persistent Redis counter (`<CACHE_NAMESPACE>:cver:<namespace>`, `INCR`), and
 value keys embed the current version. A load that started before a bump writes under the old version and is never read
@@ -904,8 +900,9 @@ If the lease is lost mid-load, the value is returned but not written. If the loc
 
 **Failures.** The cache fails open; the database remains the source of truth. Store read errors are misses, write
 errors are logged, and an unreadable version skips the cache for that call. The Redis driver uses its own connection
-with a 250 ms command timeout and no offline queue, so an outage produces misses rather than stalled requests, and the
-first reads after (re)connecting may miss. Auth rate limiting (fail-closed) and BullMQ keep their own connection
+([cache-redis-client.ts](packages/cache/src/cache-redis-client.ts)) with a 250 ms command timeout. Commands queue only
+until the first connection is ready (so boot-time invalidations are not dropped); after that there is no offline queue,
+so an outage produces misses rather than stalled requests, and the first reads after reconnecting may miss. Auth rate limiting (fail-closed) and BullMQ keep their own connection
 policies. Invalidation is best effort: process death or a Redis failure can leave an entry until its TTL.
 
 **Configuration.** `CACHE_DRIVER` is `redis` (default, shared by all replicas) or `memory` (process-local; development
@@ -998,15 +995,49 @@ Security boundaries and limits:
 ### Queues and scheduling
 
 [queue](packages/queue) implements the `JobDispatcher` port with BullMQ; [pubsub](packages/pubsub) implements the outbox
-relay and durable dispatch on a millstream `Router`. API startup:
+relay on a millstream `Router`. API startup:
 
 - Starts the [domain-event pipeline](packages/pubsub/src/domain-event-pipeline.ts): the outbox relay (polling every
-  `OUTBOX_POLL_INTERVAL_MS`) and one BullMQ subscription per durable consumer. `SIGTERM`/`SIGINT` close it gracefully.
+  `OUTBOX_POLL_INTERVAL_MS`), which enqueues one job per outbox subscription. `SIGTERM`/`SIGINT` close it gracefully.
 - Schedules hourly removal of expired sessions that were never used again, and removes the retired
   `outbox-relay-tick` / `outbox-cleanup-tick` schedulers.
 
 See [maintenance scheduling](apps/api/src/middlewares/cron.ts) and [.env.example](.env.example) for relay timing and
 `DOMAIN_EVENT_JOB_*` execution settings. Keep Redis available for queue work and authentication rate limiting.
+
+### Observability
+
+[telemetry.ts](apps/api/src/telemetry.ts) starts the OpenTelemetry Node SDK (traces, metrics and logs over OTLP/HTTP)
+as the first import of the API entrypoint. It is off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set; all other settings use
+the standard `OTEL_*` variables (service name, sampler, headers). Without the SDK every instrumentation call is a no-op.
+
+- **HTTP.** `@hono/otel` records one server span per request plus the `http.server.request.duration` histogram;
+  `url.full` drops the query string.
+- **Domain events.** `@millstream/otel` gives the outbox write and the relay producer/consumer spans (`messaging.*`
+  attributes and metrics). The trace context travels in message metadata, and the relay enqueues jobs inside its span,
+  so one trace runs from the HTTP request through the outbox to every job.
+- **SQL.** [db.telemetry.ts](packages/persistence/src/db.telemetry.ts), fed by Kysely's `log` hook: a CLIENT span
+  per query (`SELECT app_todo`, `BEGIN`, `COMMIT`, …) with the parameterized `db.query.text` (never bound values),
+  recorded only under an existing span so outbox polling does not create root traces, plus the
+  `db.client.operation.duration` histogram for every query.
+- **Jobs.** `JobDispatcher` passes `bullmq-otel` to BullMQ's `telemetry` option: enqueueing a job creates a producer
+  span whose context travels with the job, and the worker's processing span continues that trace.
+- **Cache.** [cache.telemetry.ts](packages/cache/src/cache.telemetry.ts): a `cache.get_or_set <statsType>` span around
+  each read-through (the loader's queries nest under it), `app.cache.requests` by `cache.type` and `cache.outcome`
+  (`hit`, `empty`, `miss`, `coalesced`, `bypass`), loader duration on misses, lock fallbacks, store errors and
+  invalidations. Attributes never contain cache keys.
+- **Logs.** pino adds `trace_id`/`span_id` of the active span to every line. With the SDK on, [@app/logger](packages/logger/src/index.ts)
+  also emits each line as an OTel LogRecord (severity, message, fields, `err` as `exception.*`), so logs are queryable
+  next to their traces. Stdout output is unchanged.
+
+SIGTERM/SIGINT flush pending telemetry (bounded to 5 s). Locally: `pnpm infra:otel`, set
+`OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`, then open Grafana at http://localhost:3300. **Dashboards → App**
+has **API overview** (HTTP, SQL, cache, event/job and error panels) and **Node.js runtime** (event loop delay and
+utilization, RSS, V8 heap by space, CPU, GC time and active handles, from `@opentelemetry/instrumentation-runtime-node`
+plus process CPU/RSS in telemetry.ts). Both are provisioned from
+[deployment/docker/grafana/dashboards](deployment/docker/grafana/dashboards): read-only in the UI, so edit the JSON or
+export from the UI into that file; Grafana reloads it within 10 s. Explore covers ad-hoc Tempo, Prometheus and Loki
+queries. Metrics are exported every 60 s by default; set `OTEL_METRIC_EXPORT_INTERVAL=5000` locally for faster panels.
 
 ### Composition root
 
@@ -1168,10 +1199,9 @@ Use `todo` as a worked example, not a requirement to duplicate every mechanism. 
    mapper, and focused command/query handlers. Export through [application/index.ts](packages/application/index.ts).
    Register command/query handlers in [register.ts](packages/application/src/register.ts) and in-process event handlers
    (including cache invalidation) in [events/subscriptions.ts](packages/application/src/events/subscriptions.ts).
-3. **Durable work, if needed:** add the subscription to `DURABLE_EVENT_SUBSCRIPTIONS` in
-   [events/subscriptions.ts](packages/application/src/events/subscriptions.ts); its event becomes durable automatically.
-   Register workers separately in [register-application-jobs.ts](packages/application/src/register-application-jobs.ts).
-   Remove copied jobs/outbox consumers if the new context does not need them.
+3. **Reliable work, if needed:** write an idempotent `EventHandler` and subscribe it in `OUTBOX_SUBSCRIPTIONS`
+   ([events/subscriptions.ts](packages/application/src/events/subscriptions.ts)); its event goes to the outbox automatically.
+   Remove copied outbox subscriptions if the new context does not need them.
 4. **Persistence:** add/export the Drizzle table in [schema/postgres.ts](packages/persistence/schema/postgres.ts) and
    [schema/index.ts](packages/persistence/schema/index.ts); add its Kysely table type to [db.ts](packages/persistence/src/db.ts).
    Implement the SQL repository and specification visitor; bind the port in [register.ts](packages/persistence/src/register.ts).
