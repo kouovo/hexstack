@@ -2,19 +2,20 @@
 // Side-effect import on purpose: import sorting never moves those.
 import "./telemetry";
 import "reflect-metadata";
-import { DOMAIN_EVENT_PIPELINE, type DomainEventPipeline } from "@app/application";
-import { registerDI } from "@app/bootstrap";
-import { container } from "@app/di";
-import { env } from "@app/env";
+import { registerDI } from "@app/common/bootstrap";
+import { container } from "@app/common/di";
+import { env } from "@app/common/env";
+import { DOMAIN_EVENT_PIPELINE, type DomainEventPipeline } from "@app/common/events";
 import { serve } from "@hono/node-server";
 
 import pkg from "../package.json";
 import { createApp } from "./app";
-import { startMaintenanceScheduler } from "./middlewares/cron";
+import { CONTEXTS } from "./contexts";
+import { startMaintenanceScheduler } from "./maintenance";
 import { appLogger } from "./middlewares/logger";
 import { shutdownTelemetry } from "./telemetry";
 
-registerDI();
+registerDI({ contexts: CONTEXTS });
 
 const app = createApp();
 

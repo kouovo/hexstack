@@ -1,4 +1,4 @@
-import { publicEnvScript } from "@app/env/client";
+import { publicEnvScript } from "@app/common/env/client";
 import type { Metadata } from "next";
 import Script from "next/script";
 import { connection } from "next/server";

@@ -1,4 +1,4 @@
-import type { InjectionToken } from "@app/di";
+import type { InjectionToken } from "@app/common/di";
 
 export interface CliServices {
   resolve<T>(token: InjectionToken<T>): Promise<T>;

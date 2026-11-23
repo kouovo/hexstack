@@ -1,8 +1,9 @@
 import { PassThrough } from "node:stream";
 
-import { AssignRoleCommand, MEDIATOR, USER_REPO } from "@app/application";
-import { type InjectionToken } from "@app/di";
-import { PasswordHash, UserEmail, UserEmailSpecification, UserEntity, UserPasswordHashSpecification } from "@app/domain";
+import { MEDIATOR } from "@app/common/cqrs";
+import type { InjectionToken } from "@app/common/di";
+import { AssignRoleCommand, USER_REPO } from "@app/identity";
+import { PasswordHash, UserEmail, UserEmailSpecification, UserEntity, UserPasswordHashSpecification } from "@app/identity";
 import { expect, test, vi } from "vitest";
 
 import type { CliServices } from "../context";

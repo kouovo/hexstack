@@ -1,17 +1,17 @@
-import { env } from "@app/env";
-import { HTTP_STATUS, isKnownError, toPublicError, type PublicError } from "@app/rpc";
+import { env } from "@app/common/env";
+import { HTTP_STATUS, type PublicError, resolvePublicErrorCatalog } from "@app/common/errors";
+import { authenticate } from "@app/identity";
+import { listTodos } from "@app/todo";
 import { httpInstrumentationMiddleware } from "@hono/otel";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { timing } from "hono/timing";
 
-import { authenticate } from "./middlewares/authenticate";
 import { csrf } from "./middlewares/csrf";
 import { appLogger } from "./middlewares/logger";
 import { requestContext } from "./middlewares/request-context";
 import { rpc } from "./middlewares/rpc";
-import { listTodos } from "./routes/todos";
 import { SERVICE_NAME, SERVICE_VERSION } from "./service-info";
 
 export type CreateAppOptions = {
@@ -51,7 +51,8 @@ export function createApp({ trustedOrigins = env.CORS_ORIGINS }: CreateAppOption
   app.use("*", timing());
 
   app.onError((error, c) => {
-    if (isKnownError(error)) return c.json(toPublicError(error), HTTP_STATUS[error.kind]);
+    const catalog = resolvePublicErrorCatalog();
+    if (catalog.isKnown(error)) return c.json(catalog.project(error), HTTP_STATUS[error.kind]);
     if (error instanceof HTTPException && error.status < 500) {
       return c.json({ _tag: "HttpError", message: "Request failed" } satisfies PublicError, error.status);
     }
@@ -61,7 +62,7 @@ export function createApp({ trustedOrigins = env.CORS_ORIGINS }: CreateAppOption
 
   app.notFound((c) => c.json({ _tag: "NotFoundException", message: "Not found" } satisfies PublicError, 404));
   app.get("/health", (c) => c.json({ status: "ok" }));
-  // REST example. Authorization lives in the handler: Hono routes do not inherit oRPC procedure meta.
+  // REST example, served by the todo context's HTTP port.
   app.get("/todos", (c) => listTodos(c));
   app.use("/rpc/*", rpc({ prefix: "/rpc" }));
 

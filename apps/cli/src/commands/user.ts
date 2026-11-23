@@ -1,6 +1,7 @@
-import { AssignRoleCommand, type IUserRepository, MEDIATOR, type Mediator, USER_REPO } from "@app/application";
-import { NotFoundException } from "@app/domain";
-import { UserEmail, UserEmailSpecification, UserRole } from "@app/domain";
+import { MEDIATOR, type Mediator } from "@app/common/cqrs";
+import { NotFoundException } from "@app/common/errors";
+import { AssignRoleCommand, type IUserRepository, USER_REPO } from "@app/identity";
+import { UserEmail, UserEmailSpecification, UserRole } from "@app/identity";
 import { Command, Option } from "clipanion";
 
 import { AppCommand } from "../base-command";

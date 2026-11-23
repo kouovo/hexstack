@@ -8,18 +8,15 @@
     "build": "tsup",
     "start": "dotenv -e ../../.env -- node dist/index.js",
     "check-types": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate --config drizzle.config.ts",
+    "db:studio": "dotenv -e ../../.env -- drizzle-kit studio --config drizzle.config.ts"
   },
   "dependencies": {
-    "@app/application": "workspace:*",
-    "@app/auth": "workspace:*",
-    "@app/bootstrap": "workspace:*",
-    "@app/context": "workspace:*",
-    "@app/core": "workspace:*",
-    "@app/di": "workspace:*",
-    "@app/env": "workspace:*",
-    "@app/logger": "workspace:*",
-    "@app/rpc": "workspace:*",
+    "@app/api-contract": "workspace:*",
+    "@app/common": "workspace:*",
+    "@app/identity": "workspace:*",
+    "@app/todo": "workspace:*",
     "@hono/node-server": "^2.1.5",
     "@hono/otel": "^1.3.0",
     "@opentelemetry/api": "^1.10.0",
@@ -32,9 +29,9 @@
     "thread-stream": "^4.0.0"
   },
   "devDependencies": {
-    "@app/domain": "workspace:*",
     "@app/typescript-config": "workspace:*",
     "@types/node": "^24.10.0",
+    "drizzle-kit": "^0.31.10",
     "tsup": "8.5.0",
     "tsx": "^4.20.0",
     "typescript": "7.0.2",

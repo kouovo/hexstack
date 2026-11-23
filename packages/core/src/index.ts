@@ -1,7 +1,0 @@
-export * from "./shared/domain-error";
-export * from "./shared/entity";
-export * from "./shared/id";
-export * from "./shared/identifiers";
-export * from "./shared/specification";
-export * from "./shared/state-machine";
-export * from "./shared/value-object";

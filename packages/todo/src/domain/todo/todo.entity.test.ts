@@ -1,0 +1,75 @@
+import { describe, expect, test } from "vitest";
+
+import { TodoArchivedEvent } from "./events/todo-archived.event";
+import { TodoCompletedEvent } from "./events/todo-completed.event";
+import { TodoCreatedEvent } from "./events/todo-created.event";
+import { TodoTitleSpecification } from "./specs/todo-title.specification";
+import { TodoTitle } from "./todo-title.value-object";
+import { TodoEntity } from "./todo.entity";
+import { TodoTransitionNotAllowedError, TodoTitleInvalidError } from "./todo.errors";
+
+const newTodo = () => TodoEntity.create(new TodoTitleSpecification(TodoTitle.create("Write the README")));
+
+describe(TodoEntity.name, () => {
+  test("create starts open and records TodoCreatedEvent", () => {
+    const todo = newTodo();
+    expect(todo.status.value).toBe("open");
+    expect(todo.clearDomainEvents()).toEqual([
+      expect.objectContaining({ event: TodoCreatedEvent, payload: { todoId: todo.id.value, title: todo.title.value } }),
+    ]);
+  });
+
+  test("complete moves open -> completed and records TodoCompletedEvent", () => {
+    const todo = newTodo();
+    todo.clearDomainEvents();
+    const at = new Date("2024-01-01T00:00:00Z");
+    expect(todo.complete(at)).toBeUndefined();
+    expect(todo.status.value).toBe("completed");
+    expect(todo.completedAt).toEqual(at);
+    const [event] = todo.clearDomainEvents();
+    expect(event).toMatchObject({ event: TodoCompletedEvent, payload: { todoId: todo.id.value, completedAt: at } });
+    expect(event!.uuid).toMatch(/^event/); // fixed at record time: every transport carries the same id
+  });
+
+  test("completing twice throws with context; the entity is unchanged and records no event", () => {
+    const todo = newTodo();
+    const completedAt = new Date("2024-01-01T00:00:00Z");
+    todo.complete(completedAt);
+    todo.clearDomainEvents();
+    const updatedAt = todo.updatedAt;
+
+    expect(() => todo.complete(new Date("2024-02-01T00:00:00Z"))).toThrow(TodoTransitionNotAllowedError);
+    expect(() => todo.complete()).toThrow(
+      expect.objectContaining({ _tag: "TodoTransitionNotAllowedError", todoId: todo.id.value, from: "completed", to: "completed" }),
+    );
+    expect(todo.status.value).toBe("completed");
+    expect(todo.completedAt).toEqual(completedAt);
+    expect(todo.updatedAt).toBe(updatedAt);
+    expect(todo.clearDomainEvents()).toEqual([]);
+  });
+
+  test("archive records TodoArchivedEvent with the status it left; archiving again throws", () => {
+    const todo = newTodo();
+    todo.complete();
+    todo.clearDomainEvents();
+    expect(todo.archive()).toBeUndefined();
+    expect(todo.status.value).toBe("archived");
+    const [event] = todo.clearDomainEvents();
+    expect(event).toMatchObject({ event: TodoArchivedEvent, payload: { todoId: todo.id.value, previousStatus: "completed" } });
+    expect(() => todo.archive()).toThrow(expect.objectContaining({ from: "archived", to: "archived" }));
+    expect(todo.clearDomainEvents()).toEqual([]);
+  });
+
+  test("completing an archived todo throws", () => {
+    const todo = newTodo();
+    todo.archive();
+    expect(() => todo.complete()).toThrow(
+      expect.objectContaining({ _tag: "TodoTransitionNotAllowedError", from: "archived", to: "completed" }),
+    );
+    expect(todo.status.value).toBe("archived");
+  });
+
+  test("title is validated", () => {
+    expect(() => TodoTitle.create("   ")).toThrow(TodoTitleInvalidError);
+  });
+});

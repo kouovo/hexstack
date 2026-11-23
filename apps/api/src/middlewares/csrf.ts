@@ -1,4 +1,4 @@
-import { ForbiddenException } from "@app/domain";
+import { ForbiddenException } from "@app/common/errors";
 import { createMiddleware } from "hono/factory";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);

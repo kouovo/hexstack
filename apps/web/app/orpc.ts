@@ -1,5 +1,5 @@
-import { clientEnv } from "@app/env/client";
-import { createRPCClient } from "@app/rpc/client";
+import { createRPCClient } from "@app/api-contract/client";
+import { clientEnv } from "@app/common/env/client";
 import type { InferClientOutputs } from "@orpc/client";
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 

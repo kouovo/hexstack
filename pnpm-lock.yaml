@@ -41,33 +41,18 @@ importers:
 
   apps/api:
     dependencies:
-      '@app/application':
+      '@app/api-contract':
         specifier: workspace:*
-        version: link:../../packages/application
-      '@app/auth':
+        version: link:../../packages/api-contract
+      '@app/common':
         specifier: workspace:*
-        version: link:../../packages/auth
-      '@app/bootstrap':
+        version: link:../../packages/common
+      '@app/identity':
         specifier: workspace:*
-        version: link:../../packages/bootstrap
-      '@app/context':
+        version: link:../../packages/identity
+      '@app/todo':
         specifier: workspace:*
-        version: link:../../packages/context
-      '@app/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@app/di':
-        specifier: workspace:*
-        version: link:../../packages/di
-      '@app/env':
-        specifier: workspace:*
-        version: link:../../packages/env
-      '@app/logger':
-        specifier: workspace:*
-        version: link:../../packages/logger
-      '@app/rpc':
-        specifier: workspace:*
-        version: link:../../packages/rpc
+        version: link:../../packages/todo
       '@hono/node-server':
         specifier: ^2.1.5
         version: 2.1.5(hono@4.13.13)
@@ -99,15 +84,15 @@ importers:
         specifier: ^4.0.0
         version: 4.2.0
     devDependencies:
-      '@app/domain':
-        specifier: workspace:*
-        version: link:../../packages/domain
       '@app/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
       '@types/node':
         specifier: ^24.10.0
         version: 24.19.2
+      drizzle-kit:
+        specifier: ^0.31.10
+        version: 0.31.11
       tsup:
         specifier: 8.5.0
         version: 8.5.0(jiti@2.7.0)(postcss@8.5.30)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1)
@@ -123,27 +108,15 @@ importers:
 
   apps/cli:
     dependencies:
-      '@app/application':
+      '@app/common':
         specifier: workspace:*
-        version: link:../../packages/application
-      '@app/bootstrap':
+        version: link:../../packages/common
+      '@app/identity':
         specifier: workspace:*
-        version: link:../../packages/bootstrap
-      '@app/core':
+        version: link:../../packages/identity
+      '@app/todo':
         specifier: workspace:*
-        version: link:../../packages/core
-      '@app/di':
-        specifier: workspace:*
-        version: link:../../packages/di
-      '@app/domain':
-        specifier: workspace:*
-        version: link:../../packages/domain
-      '@app/persistence':
-        specifier: workspace:*
-        version: link:../../packages/persistence
-      '@app/storage':
-        specifier: workspace:*
-        version: link:../../packages/storage
+        version: link:../../packages/todo
       clipanion:
         specifier: 4.0.0-rc.4
         version: 4.0.0-rc.4(typanion@3.14.0)
@@ -178,9 +151,9 @@ importers:
 
   apps/web:
     dependencies:
-      '@app/env':
+      '@app/common':
         specifier: workspace:*
-        version: link:../../packages/env
+        version: link:../../packages/common
       '@orpc/client':
         specifier: 1.15.7
         version: 1.15.7(@opentelemetry/api@1.10.0)
@@ -200,9 +173,9 @@ importers:
         specifier: ^19.2.8
         version: 19.3.1(react@19.3.1)
     devDependencies:
-      '@app/rpc':
+      '@app/api-contract':
         specifier: workspace:*
-        version: link:../../packages/rpc
+        version: link:../../packages/api-contract
       '@app/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
@@ -228,475 +201,17 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
-  packages/application:
+  packages/api-contract:
     dependencies:
-      '@app/core':
+      '@app/common':
         specifier: workspace:*
-        version: link:../core
-      '@app/di':
+        version: link:../common
+      '@app/identity':
         specifier: workspace:*
-        version: link:../di
-      '@app/domain':
+        version: link:../identity
+      '@app/todo':
         specifier: workspace:*
-        version: link:../domain
-      '@app/env':
-        specifier: workspace:*
-        version: link:../env
-      '@app/logger':
-        specifier: workspace:*
-        version: link:../logger
-      '@app/zod':
-        specifier: workspace:*
-        version: link:../zod
-      '@millstream/core':
-        specifier: ^0.5.0
-        version: 0.5.0
-      '@millstream/cqrs':
-        specifier: ^0.5.0
-        version: 0.5.0
-    devDependencies:
-      '@app/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@types/node':
-        specifier: ^24.10.0
-        version: 24.19.2
-      vitest:
-        specifier: ^4.1.10
-        version: 4.1.12(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-
-  packages/auth:
-    dependencies:
-      '@app/application':
-        specifier: workspace:*
-        version: link:../application
-      '@app/core':
-        specifier: workspace:*
-        version: link:../core
-      '@app/di':
-        specifier: workspace:*
-        version: link:../di
-      '@app/domain':
-        specifier: workspace:*
-        version: link:../domain
-      '@app/env':
-        specifier: workspace:*
-        version: link:../env
-      '@app/logger':
-        specifier: workspace:*
-        version: link:../logger
-      '@app/redis':
-        specifier: workspace:*
-        version: link:../redis
-    devDependencies:
-      '@app/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@types/node':
-        specifier: ^24.10.0
-        version: 24.19.2
-
-  packages/bootstrap:
-    dependencies:
-      '@app/application':
-        specifier: workspace:*
-        version: link:../application
-      '@app/auth':
-        specifier: workspace:*
-        version: link:../auth
-      '@app/cache':
-        specifier: workspace:*
-        version: link:../cache
-      '@app/context':
-        specifier: workspace:*
-        version: link:../context
-      '@app/persistence':
-        specifier: workspace:*
-        version: link:../persistence
-      '@app/pubsub':
-        specifier: workspace:*
-        version: link:../pubsub
-      '@app/queue':
-        specifier: workspace:*
-        version: link:../queue
-      '@app/redis':
-        specifier: workspace:*
-        version: link:../redis
-      '@app/storage':
-        specifier: workspace:*
-        version: link:../storage
-    devDependencies:
-      '@app/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@types/node':
-        specifier: ^24.10.0
-        version: 24.19.2
-
-  packages/cache:
-    dependencies:
-      '@app/application':
-        specifier: workspace:*
-        version: link:../application
-      '@app/di':
-        specifier: workspace:*
-        version: link:../di
-      '@app/domain':
-        specifier: workspace:*
-        version: link:../domain
-      '@app/env':
-        specifier: workspace:*
-        version: link:../env
-      '@app/logger':
-        specifier: workspace:*
-        version: link:../logger
-      '@app/redis':
-        specifier: workspace:*
-        version: link:../redis
-      '@opentelemetry/api':
-        specifier: ^1.10.0
-        version: 1.10.0
-      keyv:
-        specifier: ^5.6.0
-        version: 5.6.0
-      redlock-universal:
-        specifier: ^0.8.5
-        version: 0.8.5(ioredis@5.11.1)
-    devDependencies:
-      '@app/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@opentelemetry/context-async-hooks':
-        specifier: ^3.1.1
-        version: 3.1.1(@opentelemetry/api@1.10.0)
-      '@opentelemetry/sdk-metrics':
-        specifier: ^3.1.1
-        version: 3.1.1(@opentelemetry/api@1.10.0)
-      '@opentelemetry/sdk-trace':
-        specifier: ^3.1.1
-        version: 3.1.1(@opentelemetry/api@1.10.0)
-      '@types/node':
-        specifier: ^24.10.0
-        version: 24.19.2
-      ioredis:
-        specifier: ^5.4.6
-        version: 5.11.1
-      vitest:
-        specifier: ^4.1.10
-        version: 4.1.12(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-
-  packages/context:
-    dependencies:
-      '@app/di':
-        specifier: workspace:*
-        version: link:../di
-    devDependencies:
-      '@app/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@types/node':
-        specifier: ^24.10.0
-        version: 24.19.2
-
-  packages/core:
-    dependencies:
-      '@millstream/cqrs':
-        specifier: ^0.5.0
-        version: 0.5.0
-      nanoid:
-        specifier: ^5.1.11
-        version: 5.1.16
-    devDependencies:
-      '@app/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@types/node':
-        specifier: ^24.10.0
-        version: 24.19.2
-
-  packages/di:
-    dependencies:
-      reflect-metadata:
-        specifier: ^0.2.2
-        version: 0.2.2
-      tsyringe:
-        specifier: ^4.10.0
-        version: 4.10.0
-    devDependencies:
-      '@app/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@types/node':
-        specifier: ^24.10.0
-        version: 24.19.2
-
-  packages/domain:
-    dependencies:
-      '@app/core':
-        specifier: workspace:*
-        version: link:../core
-      '@app/zod':
-        specifier: workspace:*
-        version: link:../zod
-      '@millstream/cqrs':
-        specifier: ^0.5.0
-        version: 0.5.0
-    devDependencies:
-      '@app/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@types/node':
-        specifier: ^24.10.0
-        version: 24.19.2
-      vitest:
-        specifier: ^4.1.10
-        version: 4.1.12(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-
-  packages/env:
-    dependencies:
-      '@app/zod':
-        specifier: workspace:*
-        version: link:../zod
-      '@t3-oss/env-core':
-        specifier: ^0.13.11
-        version: 0.13.11(typescript@7.0.2)(zod@4.6.7)
-    devDependencies:
-      '@app/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@types/node':
-        specifier: ^24.10.0
-        version: 24.19.2
-
-  packages/logger:
-    dependencies:
-      '@opentelemetry/api':
-        specifier: ^1.10.0
-        version: 1.10.0
-      pino:
-        specifier: ^10.3.1
-        version: 10.4.0
-      pino-pretty:
-        specifier: ^13.1.3
-        version: 13.2.0
-    devDependencies:
-      '@app/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@opentelemetry/context-async-hooks':
-        specifier: ^3.1.1
-        version: 3.1.1(@opentelemetry/api@1.10.0)
-      '@opentelemetry/sdk-logs':
-        specifier: ^3.1.1
-        version: 3.1.1(@opentelemetry/api@1.10.0)
-      '@opentelemetry/sdk-trace':
-        specifier: ^3.1.1
-        version: 3.1.1(@opentelemetry/api@1.10.0)
-      '@types/node':
-        specifier: ^24.10.0
-        version: 24.19.2
-      vitest:
-        specifier: ^4.1.12
-        version: 4.1.12(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-
-  packages/persistence:
-    dependencies:
-      '@app/application':
-        specifier: workspace:*
-        version: link:../application
-      '@app/core':
-        specifier: workspace:*
-        version: link:../core
-      '@app/di':
-        specifier: workspace:*
-        version: link:../di
-      '@app/domain':
-        specifier: workspace:*
-        version: link:../domain
-      '@app/env':
-        specifier: workspace:*
-        version: link:../env
-      '@app/logger':
-        specifier: workspace:*
-        version: link:../logger
-      '@millstream/core':
-        specifier: ^0.5.0
-        version: 0.5.0
-      '@millstream/cqrs':
-        specifier: ^0.5.0
-        version: 0.5.0
-      '@millstream/forwarder':
-        specifier: ^0.5.0
-        version: 0.5.0
-      '@millstream/otel':
-        specifier: ^0.5.0
-        version: 0.5.0(@opentelemetry/api@1.10.0)
-      '@millstream/pg':
-        specifier: ^0.5.0
-        version: 0.5.0(kysely@0.28.18)(postgres@3.4.9)
-      '@opentelemetry/api':
-        specifier: ^1.10.0
-        version: 1.10.0
-      drizzle-orm:
-        specifier: ^0.45.2
-        version: 0.45.4(@electric-sql/pglite@0.4.6)(@opentelemetry/api@1.10.0)(kysely@0.28.18)(postgres@3.4.9)
-      kysely:
-        specifier: ^0.28.17
-        version: 0.28.18
-      kysely-postgres-js:
-        specifier: ^3.0.0
-        version: 3.0.0(kysely@0.28.18)(postgres@3.4.9)
-      postgres:
-        specifier: ^3.4.9
-        version: 3.4.9
-    devDependencies:
-      '@app/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@electric-sql/pglite':
-        specifier: ^0.4.5
-        version: 0.4.6
-      '@opentelemetry/context-async-hooks':
-        specifier: ^3.1.1
-        version: 3.1.1(@opentelemetry/api@1.10.0)
-      '@opentelemetry/sdk-metrics':
-        specifier: ^3.1.1
-        version: 3.1.1(@opentelemetry/api@1.10.0)
-      '@opentelemetry/sdk-trace':
-        specifier: ^3.1.1
-        version: 3.1.1(@opentelemetry/api@1.10.0)
-      '@types/node':
-        specifier: ^24.10.0
-        version: 24.19.2
-      drizzle-kit:
-        specifier: ^0.31.10
-        version: 0.31.11
-      vitest:
-        specifier: ^4.1.10
-        version: 4.1.12(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-
-  packages/pubsub:
-    dependencies:
-      '@app/application':
-        specifier: workspace:*
-        version: link:../application
-      '@app/di':
-        specifier: workspace:*
-        version: link:../di
-      '@app/env':
-        specifier: workspace:*
-        version: link:../env
-      '@app/logger':
-        specifier: workspace:*
-        version: link:../logger
-      '@app/persistence':
-        specifier: workspace:*
-        version: link:../persistence
-      '@millstream/core':
-        specifier: ^0.5.0
-        version: 0.5.0
-      '@millstream/cqrs':
-        specifier: ^0.5.0
-        version: 0.5.0
-      '@millstream/forwarder':
-        specifier: ^0.5.0
-        version: 0.5.0
-      '@millstream/otel':
-        specifier: ^0.5.0
-        version: 0.5.0(@opentelemetry/api@1.10.0)
-      '@millstream/pg':
-        specifier: ^0.5.0
-        version: 0.5.0(kysely@0.28.18)(postgres@3.4.9)
-    devDependencies:
-      '@app/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@app/zod':
-        specifier: workspace:*
-        version: link:../zod
-      '@types/node':
-        specifier: ^24.10.0
-        version: 24.19.2
-      vitest:
-        specifier: ^4.1.10
-        version: 4.1.12(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-
-  packages/queue:
-    dependencies:
-      '@app/application':
-        specifier: workspace:*
-        version: link:../application
-      '@app/core':
-        specifier: workspace:*
-        version: link:../core
-      '@app/di':
-        specifier: workspace:*
-        version: link:../di
-      '@app/logger':
-        specifier: workspace:*
-        version: link:../logger
-      '@app/redis':
-        specifier: workspace:*
-        version: link:../redis
-      bullmq:
-        specifier: ^5.16.0
-        version: 5.81.5
-      bullmq-otel:
-        specifier: ~1.3.1
-        version: 1.3.1
-    devDependencies:
-      '@app/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@types/node':
-        specifier: ^24.10.0
-        version: 24.19.2
-
-  packages/redis:
-    dependencies:
-      '@app/di':
-        specifier: workspace:*
-        version: link:../di
-      '@app/env':
-        specifier: workspace:*
-        version: link:../env
-      '@app/logger':
-        specifier: workspace:*
-        version: link:../logger
-      ioredis:
-        specifier: ^5.4.6
-        version: 5.11.1
-    devDependencies:
-      '@app/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@types/node':
-        specifier: ^24.10.0
-        version: 24.19.2
-
-  packages/rpc:
-    dependencies:
-      '@app/application':
-        specifier: workspace:*
-        version: link:../application
-      '@app/auth':
-        specifier: workspace:*
-        version: link:../auth
-      '@app/context':
-        specifier: workspace:*
-        version: link:../context
-      '@app/core':
-        specifier: workspace:*
-        version: link:../core
-      '@app/di':
-        specifier: workspace:*
-        version: link:../di
-      '@app/domain':
-        specifier: workspace:*
-        version: link:../domain
-      '@app/logger':
-        specifier: workspace:*
-        version: link:../logger
+        version: link:../todo
       '@orpc/client':
         specifier: 1.15.7
         version: 1.15.7(@opentelemetry/api@1.10.0)
@@ -711,38 +226,77 @@ importers:
         specifier: ^24.10.0
         version: 24.19.2
       vitest:
-        specifier: ^4.1.10
+        specifier: ^4.1.12
         version: 4.1.12(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
-  packages/storage:
+  packages/common:
     dependencies:
-      '@app/application':
-        specifier: workspace:*
-        version: link:../application
-      '@app/di':
-        specifier: workspace:*
-        version: link:../di
-      '@app/domain':
-        specifier: workspace:*
-        version: link:../domain
-      '@app/env':
-        specifier: workspace:*
-        version: link:../env
+      '@millstream/core':
+        specifier: ^0.5.0
+        version: 0.5.0
+      '@millstream/cqrs':
+        specifier: ^0.5.0
+        version: 0.5.0
+      '@millstream/forwarder':
+        specifier: ^0.5.0
+        version: 0.5.0
+      '@millstream/otel':
+        specifier: ^0.5.0
+        version: 0.5.0(@opentelemetry/api@1.10.0)
+      '@millstream/pg':
+        specifier: ^0.5.0
+        version: 0.5.0(kysely@0.28.18)(postgres@3.4.9)
+      '@opentelemetry/api':
+        specifier: ^1.10.0
+        version: 1.10.0
+      '@orpc/server':
+        specifier: 1.15.7
+        version: 1.15.7(@opentelemetry/api@1.10.0)(crossws@0.4.15(srvx@0.11.22))
+      '@t3-oss/env-core':
+        specifier: ^0.13.11
+        version: 0.13.11(typescript@7.0.2)(zod@4.6.7)
+      bullmq:
+        specifier: ^5.16.0
+        version: 5.81.5
+      bullmq-otel:
+        specifier: ~1.3.1
+        version: 1.3.1
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.4(@electric-sql/pglite@0.4.6)(@opentelemetry/api@1.10.0)(kysely@0.28.18)(postgres@3.4.9)
+      ioredis:
+        specifier: ^5.4.6
+        version: 5.11.1
+      keyv:
+        specifier: ^5.6.0
+        version: 5.6.0
+      kysely:
+        specifier: ^0.28.17
+        version: 0.28.18
+      kysely-postgres-js:
+        specifier: ^3.0.0
+        version: 3.0.0(kysely@0.28.18)(postgres@3.4.9)
       minio:
         specifier: 8.0.7
         version: 8.0.7
-    devDependencies:
-      '@app/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@types/node':
-        specifier: ^24.10.0
-        version: 24.19.2
-
-  packages/typescript-config: {}
-
-  packages/zod:
-    dependencies:
+      nanoid:
+        specifier: ^5.1.11
+        version: 5.1.16
+      pino:
+        specifier: ^10.3.1
+        version: 10.4.0
+      pino-pretty:
+        specifier: ^13.1.3
+        version: 13.2.0
+      postgres:
+        specifier: ^3.4.9
+        version: 3.4.9
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+      tsyringe:
+        specifier: ^4.10.0
+        version: 4.10.0
       zod:
         specifier: ^4.4.3
         version: 4.6.7
@@ -753,9 +307,97 @@ importers:
       '@app/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@electric-sql/pglite':
+        specifier: ^0.4.5
+        version: 0.4.6
+      '@opentelemetry/context-async-hooks':
+        specifier: ^3.1.1
+        version: 3.1.1(@opentelemetry/api@1.10.0)
+      '@opentelemetry/sdk-logs':
+        specifier: ^3.1.1
+        version: 3.1.1(@opentelemetry/api@1.10.0)
+      '@opentelemetry/sdk-metrics':
+        specifier: ^3.1.1
+        version: 3.1.1(@opentelemetry/api@1.10.0)
+      '@opentelemetry/sdk-trace':
+        specifier: ^3.1.1
+        version: 3.1.1(@opentelemetry/api@1.10.0)
       '@types/node':
         specifier: ^24.10.0
         version: 24.19.2
+      vitest:
+        specifier: ^4.1.12
+        version: 4.1.12(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/identity:
+    dependencies:
+      '@app/common':
+        specifier: workspace:*
+        version: link:../common
+      '@millstream/cqrs':
+        specifier: ^0.5.0
+        version: 0.5.0
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.4(@electric-sql/pglite@0.4.6)(@opentelemetry/api@1.10.0)(kysely@0.28.18)(postgres@3.4.9)
+      hono:
+        specifier: ^4.13.13
+        version: 4.13.13
+      kysely:
+        specifier: ^0.28.17
+        version: 0.28.18
+    devDependencies:
+      '@app/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@millstream/core':
+        specifier: ^0.5.0
+        version: 0.5.0
+      '@millstream/forwarder':
+        specifier: ^0.5.0
+        version: 0.5.0
+      '@types/node':
+        specifier: ^24.10.0
+        version: 24.19.2
+      vitest:
+        specifier: ^4.1.12
+        version: 4.1.12(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/todo:
+    dependencies:
+      '@app/common':
+        specifier: workspace:*
+        version: link:../common
+      '@millstream/cqrs':
+        specifier: ^0.5.0
+        version: 0.5.0
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.4(@electric-sql/pglite@0.4.6)(@opentelemetry/api@1.10.0)(kysely@0.28.18)(postgres@3.4.9)
+      hono:
+        specifier: ^4.13.13
+        version: 4.13.13
+      kysely:
+        specifier: ^0.28.17
+        version: 0.28.18
+    devDependencies:
+      '@app/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@millstream/core':
+        specifier: ^0.5.0
+        version: 0.5.0
+      '@millstream/forwarder':
+        specifier: ^0.5.0
+        version: 0.5.0
+      '@types/node':
+        specifier: ^24.10.0
+        version: 24.19.2
+      vitest:
+        specifier: ^4.1.12
+        version: 4.1.12(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/typescript-config: {}
 
 packages:
 
@@ -3289,6 +2931,7 @@ packages:
 
   node-abort-controller@3.1.1:
     resolution: {integrity: sha512-AGK2yQKIjRuqnc6VkX2Xj5d+QW8xZ87pa1UK6yA6ouUyuxfHuMP6umE5QK7UmTeOAymo+Zx1Fxiuw9rVx8taHQ==}
+    deprecated: This package is no longer needed on supported Node.js versions. Node.js 16+ includes AbortController and AbortSignal as built-in globals. All Node.js versions requiring this polyfill are end-of-life. Use the built-in globals instead.
 
   node-gyp-build-optional-packages@5.2.2:
     resolution: {integrity: sha512-s+w+rBWnpTMwSFbaE0UXsRlg7hU4FjekKU4eyAih5T8nJuNZT1nNsskXpxmeqSK9UzkBl6UgRlnKc8hz8IEqOw==}
@@ -3451,21 +3094,6 @@ packages:
   redis-parser@3.0.0:
     resolution: {integrity: sha512-DJnGAeenTdpMEH6uAJRK/uiyEIH9WVsUmoLwzudwGJUwZPp80PDBWPHXSAGNPwNvIXAbe7MSUB1zQFugFml66A==}
     engines: {node: '>=4'}
-
-  redlock-universal@0.8.5:
-    resolution: {integrity: sha512-LObLVwgX6sZFEDFmFqg1d3ru/ZPg5FdetmPIsImxzZsfnh/Gg1VXuRRo/B1REZzSa9xBefVu7FbKVOeO9igFDQ==}
-    engines: {node: '>=22.0.0'}
-    peerDependencies:
-      '@valkey/valkey-glide': '>=2.0.0'
-      ioredis: '>=5.0.0'
-      redis: '>=4.0.0'
-    peerDependenciesMeta:
-      '@valkey/valkey-glide':
-        optional: true
-      ioredis:
-        optional: true
-      redis:
-        optional: true
 
   reflect-metadata@0.2.2:
     resolution: {integrity: sha512-urBwgfrvVP/eAyXx4hluJivBKzuEbSQs9rKWCrCkbSxNv8mxPcUZKeuoF3Uy4mJl3Lwprp6yy5/39VWigZ4K6Q==}
@@ -5920,10 +5548,6 @@ snapshots:
   redis-parser@3.0.0:
     dependencies:
       redis-errors: 1.2.0
-
-  redlock-universal@0.8.5(ioredis@5.11.1):
-    optionalDependencies:
-      ioredis: 5.11.1
 
   reflect-metadata@0.2.2: {}
 

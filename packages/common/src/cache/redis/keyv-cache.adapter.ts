@@ -1,0 +1,313 @@
+import type { Span } from "@opentelemetry/api";
+import type Keyv from "keyv";
+
+import { NotFoundException } from "../../errors/common.errors";
+import type { LockLease, LockPort } from "../../lock/lock.port";
+import { InMemoryLockAdapter } from "../../lock/redis/lock.adapter";
+import { createLogger } from "../../logger";
+import { CACHE_EMPTY_TTL_SECONDS, type CacheGetOptions, type CachePort } from "../cache.port";
+import { type CacheOutcome, cacheTelemetry, withCacheSpan } from "./cache.telemetry";
+import { InMemoryVersionStore, type VersionStore } from "./version.store";
+
+/**
+ * Single-flight lease. Not extended: a loader slower than this lets one more replica load (a duplicate query, never a
+ * wrong value), and the slow holder then skips its write.
+ */
+const LEASE_TTL_MS = 5_000;
+/** How long a waiter watches the cache for another replica's fill before loading the source itself. */
+const WAIT_BUDGET_MS = 2_000;
+
+export interface SingleFlightOptions {
+  /** Default 5000 ms. */
+  leaseTtlMs?: number;
+  /** Default 2000 ms. */
+  waitBudgetMs?: number;
+}
+/** Cache polling while another replica loads: starts fast (most loads take milliseconds), backs off to the cap. */
+const POLL_MIN_MS = 10;
+const POLL_MAX_MS = 100;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+/** Equal jitter, so waiters that missed together do not poll in lockstep. */
+const jittered = (ms: number) => ms / 2 + Math.random() * (ms / 2);
+
+/** Negative entry. Stored as a plain JSON object so it survives Keyv serialization. */
+interface EmptySentinel {
+  readonly $appCacheEmpty: true;
+  readonly notFound?: true;
+  readonly message?: string;
+}
+
+type Lookup<T> = { outcome: "miss" } | { outcome: "empty"; sentinel: EmptySentinel } | { outcome: "hit"; value: T };
+
+function isEmptySentinel(value: unknown): value is EmptySentinel {
+  return typeof value === "object" && value !== null && (value as EmptySentinel).$appCacheEmpty === true;
+}
+
+function emptySentinel(err?: NotFoundException): EmptySentinel {
+  return err ? { $appCacheEmpty: true, notFound: true, message: err.message } : { $appCacheEmpty: true };
+}
+
+function replayEmpty<T>(sentinel: EmptySentinel): T {
+  if (sentinel.notFound) throw new NotFoundException(sentinel.message);
+  return undefined as T;
+}
+
+function emptyTtlSeconds(options?: CacheGetOptions): number {
+  return options?.emptyTtlSeconds ?? CACHE_EMPTY_TTL_SECONDS;
+}
+
+function errorType(err: unknown): string {
+  return err instanceof Error ? err.name : "unknown";
+}
+
+function statsTypeOf(options?: CacheGetOptions): string {
+  return options?.statsType ?? "default";
+}
+
+/** A replayed/cached NotFoundException is a normal cache answer, not a failed span. */
+const isExpectedError = (err: unknown) => err instanceof NotFoundException;
+
+/** Keyv swallows store errors (emits `error`): a failed read is a miss, a failed write keeps the loaded result. */
+export class KeyvCacheAdapter implements CachePort {
+  private readonly logger = createLogger(KeyvCacheAdapter.name);
+
+  constructor(
+    private readonly keyv: Keyv,
+    private readonly versions: VersionStore = new InMemoryVersionStore(),
+    private readonly lock: LockPort = new InMemoryLockAdapter(),
+    private readonly singleFlight: SingleFlightOptions = {},
+  ) {
+    this.keyv.on("error", (err: unknown) => {
+      // Store/serialization errors can embed cached values; log only the error type.
+      this.logger.warn({ errorType: errorType(err) }, "cache store error; treating as miss");
+      cacheTelemetry.error("store", errorType(err));
+    });
+  }
+
+  async get<T>(key: string, options?: CacheGetOptions): Promise<T | undefined> {
+    const result = await this.lookup<T>(key, options);
+    cacheTelemetry.request(statsTypeOf(options), result.outcome);
+    return result.outcome === "hit" ? result.value : undefined;
+  }
+
+  async set<T>(key: string, value: T, ttlSeconds?: number): Promise<void> {
+    const ttlMs = ttlSeconds && ttlSeconds > 0 ? ttlSeconds * 1000 : undefined;
+    await this.keyv.set(key, value, ttlMs);
+  }
+
+  async delete(key: string): Promise<void> {
+    await this.keyv.delete(key);
+  }
+
+  async getOrSet<T>(key: string, loader: () => Promise<T>, ttlSeconds?: number, options?: CacheGetOptions): Promise<T> {
+    return withCacheSpan(
+      `cache.get_or_set ${statsTypeOf(options)}`,
+      this.spanAttributes(options),
+      (span) => this.readThrough(key, loader, ttlSeconds, options, { key }, span),
+      isExpectedError,
+    );
+  }
+
+  async getOrSetVersioned<T>(namespace: string, loader: () => Promise<T>, ttlSeconds?: number, options?: CacheGetOptions): Promise<T> {
+    return withCacheSpan(
+      `cache.get_or_set ${statsTypeOf(options)}`,
+      { ...this.spanAttributes(options), "cache.namespace": namespace },
+      async (span) => {
+        let version: number;
+        try {
+          version = await this.versions.get(namespace);
+        } catch (err) {
+          // Without the current version we cannot tell fresh entries from invalidated ones: bypass, never guess.
+          this.logger.warn({ errorType: errorType(err), namespace }, "cache version unavailable; loading source");
+          cacheTelemetry.error("version", errorType(err));
+          this.recordOutcome(span, options, "bypass");
+          return loader();
+        }
+        const valueKey = options?.queryKey ? `${namespace}:v${version}:${options.queryKey}` : `${namespace}:v${version}`;
+        return this.readThrough(valueKey, loader, ttlSeconds, options, { namespace, version, queryKey: options?.queryKey }, span);
+      },
+      isExpectedError,
+    );
+  }
+
+  async bumpVersion(namespace: string): Promise<void> {
+    let next: number;
+    try {
+      next = await this.versions.incr(namespace);
+    } catch (err) {
+      cacheTelemetry.error("invalidate", errorType(err));
+      throw err;
+    }
+    cacheTelemetry.invalidation(namespace);
+    this.logger.debug({ namespace, version: next }, "cache version bumped (invalidation)");
+  }
+
+  private async readThrough<T>(
+    key: string,
+    loader: () => Promise<T>,
+    ttlSeconds: number | undefined,
+    options: CacheGetOptions | undefined,
+    logContext: Record<string, unknown>,
+    span?: Span,
+  ): Promise<T> {
+    const statsType = statsTypeOf(options);
+
+    const existing = await this.lookup<T>(key, options);
+    if (existing.outcome === "hit") {
+      this.logger.debug({ ...logContext, statsType }, "cache hit");
+      this.recordOutcome(span, options, "hit");
+      return existing.value;
+    }
+    if (existing.outcome === "empty") {
+      this.logger.debug({ ...logContext, statsType }, "cache hit (empty)");
+      this.recordOutcome(span, options, "empty");
+      return replayEmpty(existing.sentinel);
+    }
+
+    this.logger.debug({ ...logContext, statsType }, "cache miss; loading");
+    let loaderRan = false;
+    const timedLoader = async (): Promise<T> => {
+      loaderRan = true;
+      const started = performance.now();
+      let result: "ok" | "not_found" | "error" = "error";
+      try {
+        const value = await loader();
+        result = "ok";
+        return value;
+      } catch (err) {
+        if (err instanceof NotFoundException) result = "not_found";
+        throw err;
+      } finally {
+        cacheTelemetry.load(statsType, (performance.now() - started) / 1000, result);
+      }
+    };
+    try {
+      return options?.lock
+        ? await this.singleFlightLoad(key, timedLoader, ttlSeconds, options)
+        : await this.loadAndStore(key, timedLoader, ttlSeconds, options);
+    } finally {
+      // Not run: another replica filled the entry while we waited for the lock.
+      this.recordOutcome(span, options, loaderRan ? "miss" : "coalesced");
+    }
+  }
+
+  private spanAttributes(options?: CacheGetOptions): Record<string, string | boolean> {
+    return { "cache.type": statsTypeOf(options), "cache.lock": options?.lock ?? false };
+  }
+
+  private recordOutcome(span: Span | undefined, options: CacheGetOptions | undefined, outcome: CacheOutcome): void {
+    span?.setAttribute("cache.outcome", outcome);
+    cacheTelemetry.request(statsTypeOf(options), outcome);
+  }
+
+  private async lookup<T>(key: string, options?: CacheGetOptions): Promise<Lookup<T>> {
+    let raw: unknown;
+    try {
+      raw = await this.keyv.get(key);
+    } catch (err) {
+      this.logger.warn({ errorType: errorType(err), statsType: statsTypeOf(options) }, "cache read failed; treating as miss");
+      cacheTelemetry.error("read", errorType(err));
+      return { outcome: "miss" };
+    }
+
+    if (raw === undefined) return { outcome: "miss" };
+    if (isEmptySentinel(raw)) return { outcome: "empty", sentinel: raw };
+    return { outcome: "hit", value: raw as T };
+  }
+
+  /** Runs the loader and stores its result (or a negative entry); `canWrite` is checked just before each write. */
+  private async loadAndStore<T>(
+    key: string,
+    loader: () => Promise<T>,
+    ttlSeconds?: number,
+    options?: CacheGetOptions,
+    canWrite: () => boolean = () => true,
+  ): Promise<T> {
+    try {
+      const value = await loader();
+      if (canWrite()) await this.writeLoad(key, value, ttlSeconds, options);
+      return value;
+    } catch (err) {
+      if (canWrite()) await this.writeEmptyOnNotFound(key, err, options);
+      throw err;
+    }
+  }
+
+  /**
+   * One replica loads, the others watch the cache (not the lock), so they see the fill within one poll and never
+   * queue behind each other. Each round: try the lease (one `SET NX`); if it is held, sleep, then re-read the cache.
+   * A released lease with the entry still missing (the holder failed) is simply taken on the next round.
+   * Degrades to an unguarded load when the lock store errors (no waiting) or the wait budget runs out.
+   */
+  private async singleFlightLoad<T>(key: string, loader: () => Promise<T>, ttlSeconds?: number, options?: CacheGetOptions): Promise<T> {
+    const resource = `${this.lockPrefix()}cache:lock:${key}`;
+    const leaseTtlMs = this.singleFlight.leaseTtlMs ?? LEASE_TTL_MS;
+    const deadline = performance.now() + (this.singleFlight.waitBudgetMs ?? WAIT_BUDGET_MS);
+    let delay = POLL_MIN_MS;
+
+    for (;;) {
+      const leaseEnds = performance.now() + leaseTtlMs;
+      let lease: LockLease | undefined;
+      try {
+        lease = await this.lock.tryAcquire(resource, leaseTtlMs);
+      } catch (err) {
+        return this.fallbackLoad(key, loader, ttlSeconds, options, "cache lock unavailable; loading without single-flight", err);
+      }
+
+      if (lease) {
+        try {
+          // Double-check: another replica may have filled the entry since our miss.
+          const rechecked = await this.lookup<T>(key, options);
+          if (rechecked.outcome === "hit") return rechecked.value;
+          if (rechecked.outcome === "empty") return replayEmpty<T>(rechecked.sentinel);
+          // Past the lease another replica may already be loading and writing: drop our (older) result.
+          return await this.loadAndStore(key, loader, ttlSeconds, options, () => performance.now() < leaseEnds);
+        } finally {
+          await lease.release();
+        }
+      }
+
+      await sleep(jittered(delay));
+      delay = Math.min(delay * 2, POLL_MAX_MS);
+      const seen = await this.lookup<T>(key, options);
+      if (seen.outcome === "hit") return seen.value;
+      if (seen.outcome === "empty") return replayEmpty<T>(seen.sentinel);
+      if (performance.now() >= deadline) {
+        return this.fallbackLoad(key, loader, ttlSeconds, options, "cache single-flight wait exhausted; loading source");
+      }
+    }
+  }
+
+  private fallbackLoad<T>(
+    key: string,
+    loader: () => Promise<T>,
+    ttlSeconds: number | undefined,
+    options: CacheGetOptions | undefined,
+    message: string,
+    err?: unknown,
+  ): Promise<T> {
+    this.logger.warn({ statsType: statsTypeOf(options), ...(err === undefined ? {} : { errorType: errorType(err) }) }, message);
+    cacheTelemetry.lockFallback(statsTypeOf(options));
+    return this.loadAndStore(key, loader, ttlSeconds, options);
+  }
+
+  private async writeLoad<T>(key: string, value: T, ttlSeconds?: number, options?: CacheGetOptions): Promise<void> {
+    if (value !== undefined) {
+      await this.set(key, value, ttlSeconds);
+      return;
+    }
+    const ttl = emptyTtlSeconds(options);
+    if (ttl > 0) await this.set(key, emptySentinel(), ttl);
+  }
+
+  private async writeEmptyOnNotFound(key: string, err: unknown, options?: CacheGetOptions): Promise<void> {
+    const ttl = emptyTtlSeconds(options);
+    if (ttl <= 0 || !(err instanceof NotFoundException)) return;
+    await this.set(key, emptySentinel(err), ttl);
+  }
+
+  private lockPrefix(): string {
+    return this.keyv.namespace ? `${this.keyv.namespace}:` : "";
+  }
+}
