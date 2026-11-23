@@ -1,4 +1,4 @@
-import { isOtelExportEnabled } from "@app/logger";
+import { isOtelExportEnabled } from "@app/common/logger";
 import { metrics } from "@opentelemetry/api";
 import { RuntimeNodeInstrumentation } from "@opentelemetry/instrumentation-runtime-node";
 import { startNodeSdk } from "@opentelemetry/sdk-node";
@@ -13,7 +13,7 @@ import { SERVICE_NAME, SERVICE_VERSION } from "./service-info";
  * Exporters, batching and intervals come from the standard OTEL_* variables, e.g. OTEL_EXPORTER_OTLP_PROTOCOL
  * (default http/protobuf), OTEL_METRIC_EXPORT_INTERVAL (default 60 s), OTEL_TRACES_SAMPLER, OTEL_BSP_*, or
  * OTEL_{TRACES,METRICS,LOGS}_EXPORTER=none to turn one signal off. Traces, metrics and logs all default to OTLP; logs
- * are the pino lines @app/logger emits as LogRecords.
+ * are the pino lines @app/common/logger emits as LogRecords.
  */
 const sdk = isOtelExportEnabled()
   ? startNodeSdk({

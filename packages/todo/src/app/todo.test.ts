@@ -1,0 +1,195 @@
+import { uncached } from "@app/common/cache/testing";
+import { DomainEventScope } from "@app/common/cqrs";
+import type { ApplicationTransactionPort } from "@app/common/cqrs";
+import { outboxEventNames } from "@app/common/events";
+import { describe, expect, test, vi } from "vitest";
+
+import type { ITodoRepository } from "../adapters/todo.repository";
+import { TodoCompletedEvent } from "../domain/todo/events/todo-completed.event";
+import { TodoTitleSpecification } from "../domain/todo/specs/todo-title.specification";
+import type { TodoSpecification } from "../domain/todo/specs/todo.specification";
+import type { TodoId } from "../domain/todo/todo-id.value-object";
+import type { TodoStatusValue } from "../domain/todo/todo-status.value-object";
+import { TodoTitle } from "../domain/todo/todo-title.value-object";
+import { TodoEntity } from "../domain/todo/todo.entity";
+import { TODO_SUBSCRIPTIONS } from "../ports/events";
+import { CompleteTodoCommandHandler } from "./command/complete-todo.command";
+import { CreateTodoCommandHandler } from "./command/create-todo.command";
+import { NotifyTodoCompletedEventHandler } from "./event/notify-todo-completed-event.handler";
+import { ListTodosQueryHandler } from "./query/list-todos.query";
+
+/** Same conditional-update contract as the SQL adapter; `status`/`notified` model the stored columns. */
+class InMemoryTodoRepository implements ITodoRepository {
+  readonly rows = new Map<string, { status: TodoStatusValue; notified: boolean; todo: TodoEntity }>();
+
+  async insert(todo: TodoEntity) {
+    this.rows.set(todo.id.value, { status: todo.status.value, notified: false, todo });
+  }
+  async findOne(spec: TodoSpecification) {
+    return [...this.rows.values()].map((row) => row.todo).find((todo) => spec.isSatisfiedBy(todo));
+  }
+  async find(spec: TodoSpecification | undefined, { limit }: { limit: number }) {
+    const todos = [...this.rows.values()].map((row) => row.todo);
+    return (spec ? todos.filter((todo) => spec.isSatisfiedBy(todo)) : todos).slice(0, limit);
+  }
+  async updateIfStatus(todo: TodoEntity, expected: TodoStatusValue) {
+    const row = this.rows.get(todo.id.value);
+    if (!row || row.status !== expected) return false;
+    this.rows.set(todo.id.value, { ...row, status: todo.status.value, todo });
+    return true;
+  }
+  async markCompletionNotified(id: TodoId) {
+    const row = this.rows.get(id.value);
+    if (!row || row.status !== "completed" || row.notified) return false;
+    row.notified = true;
+    return true;
+  }
+}
+
+function setup() {
+  const repo = new InMemoryTodoRepository();
+  const order: string[] = [];
+  const transaction: ApplicationTransactionPort = {
+    run: async (work) => {
+      try {
+        const result = await work();
+        order.push("commit");
+        return result;
+      } catch (error) {
+        order.push("rollback");
+        throw error;
+      }
+    },
+  };
+  const outbox = { publishMany: vi.fn(async () => []) };
+  const eventBus = { publishMany: vi.fn(async () => []) };
+  const scope = new DomainEventScope(transaction, outbox, eventBus, outboxEventNames(TODO_SUBSCRIPTIONS));
+  return {
+    repo,
+    order,
+    eventBus,
+    outbox,
+    create: new CreateTodoCommandHandler(repo, scope),
+    complete: new CompleteTodoCommandHandler(repo, scope),
+    list: new ListTodosQueryHandler(repo, uncached()),
+  };
+}
+
+describe("todo use cases", () => {
+  test("complete publishes TodoCompletedEvent to the outbox inside the transaction", async () => {
+    const s = setup();
+    const created = await s.create.execute({ title: "ship it" });
+    s.outbox.publishMany.mockClear();
+
+    const completed = await s.complete.execute({ todoId: created.id });
+
+    expect(completed.status).toBe("completed");
+    expect(s.outbox.publishMany).toHaveBeenCalledExactlyOnceWith([
+      expect.objectContaining({ event: TodoCompletedEvent, payload: expect.objectContaining({ todoId: created.id }) }),
+    ]);
+    // Everything is broadcast after commit, the durable event included.
+    expect(s.eventBus.publishMany).toHaveBeenLastCalledWith([expect.objectContaining({ event: TodoCompletedEvent })]);
+  });
+
+  test("unknown todo throws TodoNotFoundError and rolls back", async () => {
+    const s = setup();
+    await expect(s.complete.execute({ todoId: "todo_missing" })).rejects.toMatchObject({
+      _tag: "TodoNotFoundError",
+      todoId: "todo_missing",
+    });
+    expect(s.order).toEqual(["rollback"]);
+  });
+
+  test("completing twice throws TodoTransitionNotAllowedError; no write, outbox row or broadcast", async () => {
+    const s = setup();
+    const created = await s.create.execute({ title: "once" });
+    await s.complete.execute({ todoId: created.id });
+    s.outbox.publishMany.mockClear();
+    s.eventBus.publishMany.mockClear();
+    const update = vi.spyOn(s.repo, "updateIfStatus");
+
+    await expect(s.complete.execute({ todoId: created.id })).rejects.toMatchObject({
+      _tag: "TodoTransitionNotAllowedError",
+      from: "completed",
+      to: "completed",
+    });
+    expect(update).not.toHaveBeenCalled();
+    expect(s.outbox.publishMany).not.toHaveBeenCalled();
+    expect(s.eventBus.publishMany).not.toHaveBeenCalled();
+    expect(s.order.at(-1)).toBe("rollback");
+  });
+
+  test("losing the conditional UPDATE race throws TodoModifiedConcurrentlyError; rollback, no outbox append", async () => {
+    const s = setup();
+    const created = await s.create.execute({ title: "race" });
+    s.outbox.publishMany.mockClear();
+    vi.spyOn(s.repo, "updateIfStatus").mockResolvedValueOnce(false);
+    await expect(s.complete.execute({ todoId: created.id })).rejects.toMatchObject({
+      _tag: "TodoModifiedConcurrentlyError",
+      todoId: created.id,
+      expectedStatus: "open",
+    });
+    expect(s.outbox.publishMany).not.toHaveBeenCalled();
+    expect(s.order.at(-1)).toBe("rollback");
+  });
+
+  test("infrastructure failures are thrown unchanged", async () => {
+    const s = setup();
+    const created = await s.create.execute({ title: "db down" });
+    const failure = new Error("connection terminated");
+    vi.spyOn(s.repo, "updateIfStatus").mockRejectedValueOnce(failure);
+    await expect(s.complete.execute({ todoId: created.id })).rejects.toBe(failure);
+    expect(s.order.at(-1)).toBe("rollback");
+  });
+});
+
+describe("list query", () => {
+  test("optional status filter becomes a spec; no filter returns everything", async () => {
+    const s = setup();
+    const a = await s.create.execute({ title: "a" });
+    await s.create.execute({ title: "b" });
+    await s.complete.execute({ todoId: a.id });
+
+    expect(await s.list.execute({ limit: 50 })).toHaveLength(2);
+    expect(await s.list.execute({ status: "completed", limit: 50 })).toEqual([expect.objectContaining({ id: a.id })]);
+    expect(await s.list.execute({ status: "archived", limit: 50 })).toEqual([]);
+  });
+});
+
+describe("todo async flow", () => {
+  test("outbox handler is idempotent: a redelivered job does not notify twice", async () => {
+    const repo = new InMemoryTodoRepository();
+    const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create("x")));
+    await repo.insert(todo);
+    todo.complete();
+    await repo.updateIfStatus(todo, "open");
+    const spy = vi.spyOn(repo, "markCompletionNotified");
+
+    const handler = new NotifyTodoCompletedEventHandler(repo, uncached());
+    const event = { todoId: todo.id.value, completedAt: new Date() };
+    await handler.handle(event);
+    await handler.handle(event);
+
+    expect(await Promise.all(spy.mock.results.map((r) => r.value))).toEqual([true, false]);
+  });
+
+  test("a redelivery after a failed invalidation still invalidates the list cache", async () => {
+    const repo = new InMemoryTodoRepository();
+    const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create("x")));
+    await repo.insert(todo);
+    todo.complete();
+    await repo.updateIfStatus(todo, "open");
+
+    const cache = uncached();
+    const bump = vi.spyOn(cache, "bumpVersion").mockRejectedValueOnce(new Error("redis down")).mockResolvedValue(undefined);
+    const handler = new NotifyTodoCompletedEventHandler(repo, cache);
+    const event = { todoId: todo.id.value, completedAt: new Date() };
+
+    // First attempt claims the notification, then fails to invalidate: the job is retried.
+    await expect(handler.handle(event)).rejects.toThrow("redis down");
+    await handler.handle(event);
+
+    expect(bump).toHaveBeenCalledTimes(2);
+    await expect(bump.mock.results[1]!.value).resolves.toBeUndefined();
+  });
+});

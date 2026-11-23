@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
-import { assertSignedObjectUrlOptions } from "@app/application";
+import { assertSignedObjectUrlOptions } from "@app/common/storage";
 import { Command, Option } from "clipanion";
 
 import { AppCommand } from "../base-command";

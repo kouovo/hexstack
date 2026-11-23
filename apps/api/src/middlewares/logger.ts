@@ -1,4 +1,4 @@
-import { createLogger, type ILogger } from "@app/logger";
+import { createLogger, type ILogger } from "@app/common/logger";
 
 import pkg from "../../package.json";
 

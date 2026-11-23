@@ -1,0 +1,27 @@
+{
+  "name": "@app/todo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@app/common": "workspace:*",
+    "@millstream/cqrs": "^0.5.0",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.13.13",
+    "kysely": "^0.28.17"
+  },
+  "devDependencies": {
+    "@app/typescript-config": "workspace:*",
+    "@millstream/core": "^0.5.0",
+    "@millstream/forwarder": "^0.5.0",
+    "@types/node": "^24.10.0",
+    "vitest": "^4.1.12"
+  }
+}

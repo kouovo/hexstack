@@ -1,0 +1,26 @@
+{
+  "name": "@app/api-contract",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@app/common": "workspace:*",
+    "@app/identity": "workspace:*",
+    "@app/todo": "workspace:*",
+    "@orpc/client": "1.15.7",
+    "@orpc/server": "1.15.7"
+  },
+  "devDependencies": {
+    "@app/typescript-config": "workspace:*",
+    "@types/node": "^24.10.0",
+    "vitest": "^4.1.12"
+  }
+}

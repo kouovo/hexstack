@@ -1,0 +1,81 @@
+import { z } from "../zod";
+
+export const serverEnvSchema = {
+  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  PORT: z.coerce.number().int().positive().default(3001),
+  /** Adds `Secure` to the session cookie. Keep true; Safari needs false for plain-http localhost. */
+  SESSION_COOKIE_SECURE: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+  /** Comma-separated list of browser origins allowed by CORS. */
+  CORS_ORIGINS: z
+    .string()
+    .default("")
+    .transform((value) =>
+      value
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+    ),
+  /** `redis` is shared by every replica; `memory` is process-local (development/single instance). Fail-open either way. */
+  CACHE_DRIVER: z.enum(["redis", "memory"]).default("redis"),
+  /** Keyv namespace: every cache, version and lock key starts with `<namespace>:`. Distinct per app/environment. */
+  CACHE_NAMESPACE: z
+    .string()
+    .trim()
+    .min(1)
+    .regex(/^[^:\s](?:.*[^:\s])?$/, "must not start/end with ':' or whitespace")
+    .default("app:cache"),
+  STORAGE_DRIVER: z.enum(["local", "minio"]).default("local"),
+  STORAGE_BUCKET: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+    .default("app"),
+  STORAGE_LOCAL_ROOT: z.string().trim().min(1).default(".app-storage"),
+  STORAGE_MINIO_ENDPOINT: z.url().default("http://localhost:9000"),
+  STORAGE_MINIO_ACCESS_KEY: z.string().min(1).optional(),
+  STORAGE_MINIO_SECRET_KEY: z.string().min(1).optional(),
+  STORAGE_MINIO_REGION: z.string().trim().min(1).default("us-east-1"),
+  STORAGE_MINIO_USE_SSL: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+  /** App connection string. May point at a transaction-mode pooler such as PgBouncer. */
+  POSTGRES_URL: z.string().optional(),
+  /** Direct (non-pooled) Postgres for migrations, which need session state. Defaults to POSTGRES_URL. */
+  POSTGRES_DIRECT_URL: z.string().optional(),
+  /** Use named prepared statements. Set false behind poolers without prepared-statement support. */
+  POSTGRES_PREPARE: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+  REDIS_URL: z.string().trim().optional(),
+  /** Postgres statement_timeout for ordinary app transactions. 0 = disabled. */
+  DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().nonnegative().default(0),
+  /** Postgres statement_timeout for heavy operations. 0 = disabled. */
+  DB_HEAVY_STATEMENT_TIMEOUT_MS: z.coerce.number().int().nonnegative().default(120_000),
+  /** How often (ms) the relay polls the millstream outbox when it is empty. */
+  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1_000),
+  /** BullMQ execution policy (attempts, exponential backoff) for each job the relay enqueues. */
+  DOMAIN_EVENT_JOB_ATTEMPTS: z.coerce.number().int().positive().default(10),
+  DOMAIN_EVENT_JOB_BACKOFF_MS: z.coerce.number().int().positive().default(1_000),
+};
+
+export const clientEnvSchema = {
+  NEXT_PUBLIC_RPC_URL: z
+    .url({ protocol: /^https?$/ })
+    .pipe(
+      z.string().refine((value) => {
+        const url = new URL(value);
+        return !url.username && !url.password;
+      }, "Public URLs must not contain credentials"),
+    )
+    .default("http://localhost:3001/rpc"),
+};
+
+export const envSchema = {
+  server: serverEnvSchema,
+  client: clientEnvSchema,
+} as const;

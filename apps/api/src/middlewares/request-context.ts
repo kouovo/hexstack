@@ -1,5 +1,5 @@
-import { requestContextStorage } from "@app/context";
-import { generateId } from "@app/core";
+import { requestContextStorage } from "@app/common/context";
+import { generateId } from "@app/common/ddd";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";

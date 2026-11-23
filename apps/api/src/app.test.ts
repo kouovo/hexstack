@@ -1,28 +1,21 @@
+import { registerApplication } from "@app/common/bootstrap";
+import { CACHE } from "@app/common/cache";
+import { APPLICATION_TRANSACTION_PORT } from "@app/common/cqrs";
+import { container } from "@app/common/di";
+import { DOMAIN_EVENT_OUTBOX } from "@app/common/events";
 import {
-  APPLICATION_TRANSACTION_PORT,
-  CACHE,
+  identityContext,
   type ISessionRepository,
-  type ITodoRepository,
   type IUserRepository,
-  DOMAIN_EVENT_OUTBOX,
   PASSWORD_HASHER,
   RATE_LIMITER,
   type RateLimiter,
-  registerDomainCqrsHandlers,
   SESSION_REPO,
-  TODO_REPO,
   USER_REPO,
-} from "@app/application";
-import { container } from "@app/di";
-import {
-  type Password,
-  PasswordHash,
-  SessionEntity,
-  type TodoEntity,
-  type UserEntity,
-  UserRole,
-  RateLimiterUnavailableError,
-} from "@app/domain";
+} from "@app/identity";
+import { type Password, PasswordHash, SessionEntity, type UserEntity, UserRole, RateLimiterUnavailableError } from "@app/identity";
+import { type ITodoRepository, TODO_REPO, todoContext } from "@app/todo";
+import type { TodoEntity } from "@app/todo";
 import { beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { createApp } from "./app";
@@ -77,7 +70,7 @@ beforeAll(() => {
       bumpVersion: async () => {},
     },
   });
-  registerDomainCqrsHandlers();
+  registerApplication([identityContext, todoContext]);
 });
 beforeEach(() => {
   todos.clear();

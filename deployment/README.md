@@ -110,7 +110,7 @@ For a deployment, prefer a private Docker network and service DNS names over hos
 ## Deployment responsibilities
 
 - Supply API secrets at **runtime**, use HTTPS, set `SESSION_COOKIE_SECURE=true`, and configure exact `CORS_ORIGINS`.
-  The UI and API must be same-site for `SameSite=Lax` cookies; see [security rules](../README.md#deployment-rules).
+  The UI and API must be same-site for `SameSite=Lax` cookies; see [deployment requirements](../docs/auth.md#deployment-requirements).
 - Provision Postgres/Redis and wait for them to be ready before migration/API startup. Images do not run migrations
   automatically, wait for dependencies, or provision TLS/proxies. Review the outbox migration's stop-old-process warning.
 - If you use a transaction-mode pooler, point `POSTGRES_URL` at it (PgBouncer ≥1.21 with `max_prepared_statements`, or set
