@@ -92,7 +92,7 @@ live in separate subpaths, so importing a port never loads its driver.
 | `di`, `env`, `env/client`, `logger`, `zod`                | tsyringe, validated environment, pino logger, Zod                                 |
 | `context`                                                 | Request-scoped `AsyncLocalStorage`: request id, client address, principal         |
 | `auth`                                                    | `Permissions`, `AuthorizationPolicy` port, `currentPrincipal()`, `authorize()`    |
-| `cqrs`                                                    | Mediator, `handle()`, `DomainEventScope`, `ApplicationTransactionPort`            |
+| `cqrs`                                                    | Mediator, `handle()`, `DomainEventTracker`, `ApplicationTransactionPort`          |
 | `events`                                                  | Subscriptions, in-process event bus, outbox workers, pipeline port                |
 | `events/millstream`                                       | Outbox relay (`MillstreamDomainEventPipeline`)                                    |
 | `cache`, `cache/redis`, `cache/testing`                   | `CachePort`; Keyv/Redis adapter; in-memory test helper                            |
@@ -160,8 +160,8 @@ An authenticated `todo.complete` call:
 | 3    | [identity ports/http.ts](../packages/identity/src/ports/http.ts)                              | Session cookie → principal (user id, session id, current role)        |
 | 4    | [common rpc/procedure.ts](../packages/common/src/rpc/procedure.ts)                            | Requires a principal and the procedure's `permissions` meta           |
 | 5    | [todo ports/rpc.ts](../packages/todo/src/ports/rpc.ts)                                        | Dispatches `CompleteTodoCommand` through the mediator                 |
-| 6    | [complete-todo.command.ts](../packages/todo/src/app/command/complete-todo.command.ts)         | Loads the aggregate, applies the transition, persists, tracks events  |
-| 7    | [domain-event-scope.ts](../packages/common/src/cqrs/domain-event-scope.ts)                    | One transaction for the write and the outbox row; broadcast after commit |
+| 6    | [complete-todo.command.ts](../packages/todo/src/app/command/complete-todo.command.ts)         | Loads the aggregate, applies the transition, persists in a transaction |
+| 7    | [domain-event-tracker.ts](../packages/common/src/cqrs/domain-event-tracker.ts)                | Repository tracks the aggregate; outbox row before commit, broadcast after |
 | 8    | [common rpc/errors.ts](../packages/common/src/rpc/errors.ts)                                  | Maps thrown domain errors through the public error catalog            |
 
 Authorization is checked by the context-independent procedure builder through the

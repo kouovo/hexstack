@@ -38,7 +38,7 @@ persists, and returns an explicit DTO. The entity decides whether a transition i
 persisted together.
 
 ```ts
-const changed = await this.events.run(async (track) => {
+const changed = await this.transaction.run(async () => {
   const todo = await this.todoRepo.findOne(new TodoIdSpecification(id));
   if (!todo) throw new TodoNotFoundError({ todoId: id.value });
   const expectedStatus = todo.status.value;
@@ -46,37 +46,48 @@ const changed = await this.events.run(async (track) => {
   if (!(await this.todoRepo.updateIfStatus(todo, expectedStatus))) {
     throw new TodoModifiedConcurrentlyError({ todoId: id.value, expectedStatus });
   }
-  track(todo);
   return todo;
 });
 return toTodoDTO(changed);
 ```
 
-Reference: [complete-todo.command.ts](../packages/todo/src/app/command/complete-todo.command.ts). Work that must not run
-inside the transaction goes before `run` (for example, [sign-up](../packages/identity/src/app/command/sign-up.command.ts)
+The handler only opens a transaction (`ApplicationTransactionPort`); it never touches events. Reference:
+[complete-todo.command.ts](../packages/todo/src/app/command/complete-todo.command.ts). Work that must not run inside
+the transaction goes before `run` (for example, [sign-up](../packages/identity/src/app/command/sign-up.command.ts)
 hashes the password first, then inserts the user and the first session atomically).
 
 ## Transactions
 
-[`DomainEventScope.run(work, options?)`](../packages/common/src/cqrs/domain-event-scope.ts):
+`ApplicationTransactionPort.run(work, options?)` opens a transaction through the
+[`TransactionManager`](../packages/common/src/db/transaction.ts). The outermost transaction carries two hook lists,
+shared by every nested `run`:
 
-1. Opens an application transaction through `ApplicationTransactionPort`.
-2. Runs `work(track)`. `track(aggregate)` registers aggregates whose recorded events must be published.
-3. After `work` returns, collects the tracked aggregates' events and writes those that have an outbox subscription
-   to the outbox, in the same transaction.
-4. Commits, then publishes every collected event on the in-process bus.
+| Hook           | When                                                    | On error                                     |
+| -------------- | ------------------------------------------------------- | -------------------------------------------- |
+| `beforeCommit` | Inside the transaction, after `work` (hooks may chain)   | Rolls the transaction back                   |
+| `afterCommit`  | After the outermost commit, in order; skipped on rollback | Logged and swallowed: the commit stands      |
+
+Domain events ride on these hooks through the [`DomainEventTracker`](../packages/common/src/cqrs/domain-event-tracker.ts):
+
+1. Every repository save method calls `tracker.track(aggregate)`. The first call in a transaction registers one
+   `beforeCommit` and one `afterCommit` hook.
+2. `beforeCommit`: collects the tracked aggregates' events (recorded up to that moment) and writes those that have
+   an outbox subscription to the outbox, in the same transaction.
+3. `afterCommit`: publishes every collected event on the in-process bus.
 
 | Property         | Behavior                                                                                                         |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------- |
 | Rollback         | Any throw rolls back the writes and the outbox rows; nothing is published                                       |
-| Nesting          | A nested `run` joins the outer one; events go out once, after the outermost commit                               |
-| Savepoints       | None: an outer scope that catches an inner throw still commits the inner writes                                 |
+| Nesting          | A nested `run` joins the outer one (its options are ignored); events go out once, after the outermost commit    |
+| Savepoints       | None: an outer `run` that catches an inner throw commits the inner writes, and their events with them           |
+| No transaction   | Saving an aggregate that has events outside a transaction throws before writing                                  |
 | Broadcast errors | Logged; the committed write stands                                                                               |
 | Options          | `isolationLevel` (default `read committed`), `statementTimeoutMs`, `heavy` (uses `DB_HEAVY_STATEMENT_TIMEOUT_MS`) |
 
-Repositories and the outbox obtain their executor from the ambient
-[`TransactionManager`](../packages/common/src/db/transaction.ts), so they cannot commit independently. Do not open a
-`DomainEventScope` inside a bare `ApplicationTransactionPort.run`: it would broadcast before that outer commit.
+Repositories and the outbox obtain their executor from the ambient `TransactionManager`, so they cannot commit
+independently. A new repository for an aggregate root must inject the tracker (`@injectDomainEventTracker()`) and
+call `track` in every method that persists it; a conditional write tracks only when it applied
+([`updateIfStatus`](../packages/todo/src/adapters/todo.repository.ts)).
 
 ## Concurrency
 

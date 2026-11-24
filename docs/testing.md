@@ -38,9 +38,13 @@ registerApplication([identityContext, todoContext]);
 
 `registerApplication()` does not call `registerAdapters()`, so no database or Redis client is created.
 
-Use-case tests construct handlers directly. `DomainEventScope` takes the set of durable event names as its fourth
+Use-case tests construct handlers directly, with
+[`FakeApplicationTransaction`](../packages/common/src/cqrs/testing/index.ts) (`@app/common/cqrs/testing`): it has
+the real nesting and commit-hook semantics and records `"commit"` / `"rollback"` in its `log`. In-memory repositories
+call `DomainEventTracker.track` like the SQL ones. The tracker takes the set of durable event names as its fourth
 argument; pass `outboxEventNames(TODO_SUBSCRIPTIONS)` to reproduce production behavior, or `new Set()` when the test
-does not involve the outbox.
+does not involve the outbox. Fixtures persisted outside a transaction must have no pending events
+(`clearDomainEvents()`), or be written inside `run`.
 
 ## Test database
 
