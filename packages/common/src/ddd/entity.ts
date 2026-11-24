@@ -26,6 +26,10 @@ export abstract class AggregateRoot<
     this.domainEvents.push(event.of(payload, { uuid: generateId("event") }));
   }
 
+  hasDomainEvents(): boolean {
+    return this.domainEvents.length > 0;
+  }
+
   clearDomainEvents(): EventItem[] {
     const events = [...this.domainEvents];
     this.domainEvents.length = 0;

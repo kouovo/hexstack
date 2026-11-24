@@ -1,4 +1,4 @@
-import { DomainEventScope } from "@app/common/cqrs";
+import { DomainEventTracker } from "@app/common/cqrs";
 import { ApplicationTransactionAdapter } from "@app/common/db";
 import { createTestDatabase, type TestDatabase } from "@app/common/db/testing";
 import { afterAll, beforeAll, beforeEach, expect, test } from "vitest";
@@ -21,10 +21,14 @@ let db: TestDatabase;
 let users: UserRepository;
 let sessionRows: SessionRepository;
 let sessions: SessionService;
+let transaction: ApplicationTransactionAdapter;
+
+const noEvents = { publishMany: async () => [] };
 
 beforeAll(async () => {
   db = await createTestDatabase();
-  users = new UserRepository(db.transactions);
+  transaction = new ApplicationTransactionAdapter(db.transactions);
+  users = new UserRepository(db.transactions, new DomainEventTracker(transaction, noEvents, noEvents, new Set()));
   sessionRows = new SessionRepository(db.transactions);
   sessions = new SessionService(sessionRows, users);
 }, 30_000);
@@ -35,10 +39,14 @@ afterAll(async () => {
   await db?.close();
 });
 
-const newUser = (email = "ada@example.com") =>
-  UserEntity.signUp(
+/** A fixture without pending events, so it can be inserted outside a transaction. */
+const newUser = (email = "ada@example.com") => {
+  const user = UserEntity.signUp(
     new UserEmailSpecification(UserEmail.create(email)).and(new UserPasswordHashSpecification(PasswordHash.rehydrate("$argon2id$stub"))),
   );
+  user.clearDomainEvents();
+  return user;
+};
 
 test("users round-trip and are found by id / email specs", async () => {
   const user = newUser();
@@ -71,12 +79,7 @@ test("a racing duplicate inside the sign-up transaction rolls back the account a
     { hash: async () => PasswordHash.rehydrate("$stub"), verify: async () => false },
     { consume: async () => true },
     sessions,
-    new DomainEventScope(
-      new ApplicationTransactionAdapter(db.transactions),
-      { publishMany: async () => [] },
-      { publishMany: async () => [] },
-      new Set(),
-    ),
+    transaction,
   );
   const existing = newUser();
   await users.insert(existing);
@@ -106,8 +109,8 @@ test("the password hash round-trips as an opaque value object", async () => {
 test("role changes persist; the CHECK constraint rejects unknown roles at the database too", async () => {
   const user = newUser();
   await users.insert(user);
-  user.changeRole(UserRole.create("admin"));
-  await users.update(user);
+  user.changeRole(UserRole.create("admin")); // records UserRoleChangedEvent: persisted in a transaction
+  await transaction.run(() => users.update(user));
   expect((await users.findOne(new UserIdSpecification(user.id)))?.role.value).toBe("admin");
   await expect(db.pglite.exec(`UPDATE ${USER_TABLE} SET role = 'root'`)).rejects.toThrow();
 });
@@ -154,12 +157,7 @@ test("sign-up rolls back the account when creating its session fails", async () 
     { hash: async () => PasswordHash.rehydrate("$stub"), verify: async () => false },
     { consume: async () => true },
     failedSessions,
-    new DomainEventScope(
-      new ApplicationTransactionAdapter(db.transactions),
-      { publishMany: async () => [] },
-      { publishMany: async () => [] },
-      new Set(),
-    ),
+    transaction,
   );
   await expect(handler.execute({ email: "ada@example.com", password: "correct horse", clientKey: "test" })).rejects.toThrow(
     "session insert failed",

@@ -1,4 +1,4 @@
-import { type DomainEventScope, injectDomainEventScope } from "@app/common/cqrs";
+import { type ApplicationTransactionPort, injectApplicationTransaction } from "@app/common/cqrs";
 import { defineCommand, type IRequestHandler, type RequestPayload } from "@app/common/cqrs";
 import { singleton } from "@app/common/di";
 import { z } from "@app/common/zod";
@@ -23,15 +23,14 @@ export type CreateTodoCommand = RequestPayload<typeof CreateTodoCommand>;
 export class CreateTodoCommandHandler implements IRequestHandler<typeof CreateTodoCommand> {
   constructor(
     @injectTodoRepo() private readonly todoRepo: ITodoRepository,
-    @injectDomainEventScope() private readonly events: DomainEventScope,
+    @injectApplicationTransaction() private readonly transaction: ApplicationTransactionPort,
   ) {}
 
   async execute(command: CreateTodoCommand): Promise<ITodoDTO> {
     const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create(command.title)));
 
-    await this.events.run(async (track) => {
+    await this.transaction.run(async () => {
       await this.todoRepo.insert(todo);
-      track(todo);
     });
 
     return toTodoDTO(todo);

@@ -68,8 +68,8 @@ export class TodoRepository implements ITodoRepository {
 }
 ```
 
-`getExecutor()` returns the current transaction when called inside `DomainEventScope.run` /
-`ApplicationTransactionPort.run`, and the pool otherwise. The query builder itself is untyped (`Kysely<any>`); the
+`getExecutor()` returns the current transaction when called inside `ApplicationTransactionPort.run`, and the pool
+otherwise. The query builder itself is untyped (`Kysely<any>`); the
 type parameter is what restricts a context to its tables.
 
 Shared helpers in [`@app/common/db`](../packages/common/src/db): `QueryVisitor` (specification → SQL),

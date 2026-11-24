@@ -2,6 +2,7 @@ import {
   APPLICATION_TRANSACTION_PORT,
   type ApplicationTransactionOptions,
   type ApplicationTransactionPort,
+  type TransactionHooks,
 } from "../cqrs/transaction.port";
 import { container, singleton } from "../di";
 import { env } from "../env";
@@ -21,6 +22,10 @@ export class ApplicationTransactionAdapter implements ApplicationTransactionPort
       isolationLevel: options.isolationLevel ?? "read committed",
       statementTimeoutMs,
     });
+  }
+
+  current(): TransactionHooks | undefined {
+    return this.transactionManager.currentHooks();
   }
 }
 

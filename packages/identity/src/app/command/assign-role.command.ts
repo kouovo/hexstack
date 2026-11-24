@@ -1,4 +1,4 @@
-import { type DomainEventScope, injectDomainEventScope } from "@app/common/cqrs";
+import { type ApplicationTransactionPort, injectApplicationTransaction } from "@app/common/cqrs";
 import { defineCommand, type IRequestHandler, type RequestPayload } from "@app/common/cqrs";
 import { singleton } from "@app/common/di";
 import { NotFoundException } from "@app/common/errors";
@@ -27,15 +27,14 @@ export type AssignRoleCommand = RequestPayload<typeof AssignRoleCommand>;
 export class AssignRoleCommandHandler implements IRequestHandler<typeof AssignRoleCommand> {
   constructor(
     @injectUserRepo() private readonly userRepo: IUserRepository,
-    @injectDomainEventScope() private readonly events: DomainEventScope,
+    @injectApplicationTransaction() private readonly transaction: ApplicationTransactionPort,
   ) {}
 
   async execute(command: AssignRoleCommand): Promise<IUserDTO> {
-    const user = await this.events.run(async (track) => {
+    const user = await this.transaction.run(async () => {
       const user = await this.userRepo.findOne(new UserIdSpecification(UserId.create(command.userId)));
       if (!user) throw new NotFoundException(`User ${command.userId} not found`);
       if (user.changeRole(UserRole.create(command.role))) await this.userRepo.update(user);
-      track(user);
       return user;
     });
     return toUserDTO(user);
