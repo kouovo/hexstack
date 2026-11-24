@@ -3,7 +3,9 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import type { IsolationLevel, Kysely, Transaction as KyselyTransaction } from "kysely";
 import { sql } from "kysely";
 
+import type { TransactionHook, TransactionHooks } from "../cqrs/transaction.port";
 import { container, inject, singleton } from "../di";
+import { createLogger } from "../logger";
 import type { ISqlQueryBuilder } from "./kysely";
 import { injectSqlQueryBuilder } from "./query-builder";
 
@@ -15,6 +17,7 @@ export type UntypedTransactionExecutor = Kysely<any> | UntypedTransaction;
 
 export interface TransactionScope {
   transaction: DatabaseTransaction;
+  hooks: TransactionHooks;
 }
 
 export interface TransactionOptions {
@@ -38,6 +41,8 @@ export interface ITransactionManager {
   withTransaction: <T = any>(callback: () => Promise<T>, options?: TransactionOptions) => Promise<T>;
   getExecutor: <DB = any>() => TransactionExecutor<DB>;
   getUntypedExecutor: () => UntypedTransactionExecutor;
+  /** Hooks of the active transaction; undefined outside one. */
+  currentHooks: () => TransactionHooks | undefined;
 }
 
 export const TRANSACTION_MANAGER = Symbol.for("TRANSACTION_MANAGER");
@@ -59,6 +64,18 @@ export function formatStatementTimeout(ms: number): string {
   return `${Math.floor(ms)}ms`;
 }
 
+const logger = createLogger("transaction");
+
+async function runAfterCommit(hooks: readonly TransactionHook[]): Promise<void> {
+  for (const hook of hooks) {
+    try {
+      await hook();
+    } catch (error) {
+      logger.warn({ err: error }, "after-commit hook failed; the transaction is committed");
+    }
+  }
+}
+
 @singleton()
 export class TransactionManager implements ITransactionManager {
   constructor(
@@ -68,7 +85,7 @@ export class TransactionManager implements ITransactionManager {
     private readonly queryBuilder: ISqlQueryBuilder,
   ) {}
 
-  withTransaction<T = any>(callback: () => Promise<T>, options: TransactionOptions = {}): Promise<T> {
+  async withTransaction<T = any>(callback: () => Promise<T>, options: TransactionOptions = {}): Promise<T> {
     if (this.currentTransaction) {
       return callback();
     }
@@ -78,14 +95,28 @@ export class TransactionManager implements ITransactionManager {
       transactionBuilder = transactionBuilder.setIsolationLevel(options.isolationLevel);
     }
 
-    return transactionBuilder.execute(async (transaction) => {
+    const before: TransactionHook[] = [];
+    const after: TransactionHook[] = [];
+    const hooks: TransactionHooks = {
+      beforeCommit: (hook) => void before.push(hook),
+      afterCommit: (hook) => void after.push(hook),
+    };
+
+    const result = await transactionBuilder.execute(async (transaction) => {
       if (options.statementTimeoutMs !== undefined && options.statementTimeoutMs > 0) {
         // set_config(..., is_local=true) ≡ SET LOCAL; parameterized, no string concat of SQL.
         await sql`select set_config('statement_timeout', ${formatStatementTimeout(options.statementTimeoutMs)}, true)`.execute(transaction);
       }
 
-      return this.scopeStorage.run({ transaction }, callback);
+      return this.scopeStorage.run({ transaction, hooks }, async () => {
+        const result = await callback();
+        for (let hook = before.shift(); hook; hook = before.shift()) await hook();
+        return result;
+      });
     });
+    // The scope is gone: an after-commit hook that writes runs on the pool, not in the committed transaction.
+    await runAfterCommit(after);
+    return result;
   }
 
   getExecutor<DB = any>(): TransactionExecutor<DB> {
@@ -94,6 +125,10 @@ export class TransactionManager implements ITransactionManager {
 
   getUntypedExecutor(): UntypedTransactionExecutor {
     return this.currentTransaction ?? this.queryBuilder;
+  }
+
+  currentHooks(): TransactionHooks | undefined {
+    return this.scopeStorage.getStore()?.hooks;
   }
 
   private get currentTransaction(): DatabaseTransaction | undefined {
