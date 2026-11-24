@@ -4,8 +4,7 @@ A TypeScript modular monolith template for applications with real business rules
 hexagonal architecture (ports and adapters), CQRS, a transactional outbox, cookie sessions with RBAC, Redis caching,
 and local or S3-compatible object storage.
 
-The repository is organized like [ThreeDotsLabs' Wild Workouts](https://github.com/ThreeDotsLabs/wild-workouts-go-ddd-example):
-one package per bounded context, each split into `domain`, `app`, `adapters`, `ports` and `service`, plus a `common`
+The repository is organized as one package per bounded context, each split into `domain`, `app`, `adapters`, `ports` and `service`, plus a `common`
 package for shared infrastructure. It ships two contexts: **todo**, a small worked example, and **identity**
 (accounts, sessions, roles), which most applications reuse as is.
 

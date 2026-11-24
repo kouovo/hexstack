@@ -1,9 +1,7 @@
 # Architecture
 
 hexstack is a modular monolith. One deployable API (plus a CLI) serves several bounded contexts that share a
-Postgres database and a Redis instance but not code. The package structure follows
-[Wild Workouts](https://github.com/ThreeDotsLabs/wild-workouts-go-ddd-example): packages are cut by bounded context,
-not by technical layer, and each context is layered internally.
+Postgres database and a Redis instance but not code. Packages are cut by bounded context, not by technical layer, and each context is layered internally.
 
 - [Packages](#packages)
 - [Layers inside a context](#layers-inside-a-context)
