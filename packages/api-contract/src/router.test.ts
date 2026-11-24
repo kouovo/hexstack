@@ -2,6 +2,7 @@ import { registerApplication } from "@app/common/bootstrap";
 import { CACHE } from "@app/common/cache";
 import { type RequestPrincipal, requestContextStorage } from "@app/common/context";
 import { APPLICATION_TRANSACTION_PORT } from "@app/common/cqrs";
+import { FakeApplicationTransaction } from "@app/common/cqrs/testing";
 import { container } from "@app/common/di";
 import { DOMAIN_EVENT_OUTBOX } from "@app/common/events";
 import { identityContext, type IUserRepository, PASSWORD_HASHER, RATE_LIMITER, SESSION_REPO, statements, USER_REPO } from "@app/identity";
@@ -58,7 +59,7 @@ beforeAll(() => {
   container.register(PASSWORD_HASHER, { useValue: {} });
   container.register(RATE_LIMITER, { useValue: {} });
   container.register(SESSION_REPO, { useValue: {} });
-  container.register(APPLICATION_TRANSACTION_PORT, { useValue: { run: (work: () => Promise<unknown>) => work() } });
+  container.register(APPLICATION_TRANSACTION_PORT, { useValue: new FakeApplicationTransaction() });
   container.register(CACHE, {
     useValue: {
       getOrSetVersioned: (_namespace: string, load: () => Promise<unknown>) => load(),

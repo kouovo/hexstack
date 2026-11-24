@@ -1,5 +1,5 @@
-import { DomainEventScope } from "@app/common/cqrs";
-import type { ApplicationTransactionPort } from "@app/common/cqrs";
+import { DomainEventTracker } from "@app/common/cqrs";
+import { FakeApplicationTransaction } from "@app/common/cqrs/testing";
 import { NotFoundException } from "@app/common/errors";
 import { describe, expect, test, vi } from "vitest";
 
@@ -24,6 +24,7 @@ import { SessionService } from "./session.service";
 
 class InMemoryUsers implements IUserRepository {
   readonly rows = new Map<string, UserEntity>();
+  constructor(private readonly events: DomainEventTracker) {}
   async findOne(spec: UserSpecification) {
     return [...this.rows.values()].find((user) => spec.isSatisfiedBy(user));
   }
@@ -31,11 +32,13 @@ class InMemoryUsers implements IUserRepository {
     return [...this.rows.values()].filter((user) => !spec || spec.isSatisfiedBy(user));
   }
   async insert(user: UserEntity) {
+    this.events.track(user);
     if ([...this.rows.values()].some((u) => u.email.equals(user.email)))
       throw new EmailAlreadyRegisteredError({ detectedBy: "unique-constraint" });
     this.rows.set(user.id.value, user);
   }
   async update(user: UserEntity) {
+    this.events.track(user);
     this.rows.set(user.id.value, user);
   }
 }
@@ -75,26 +78,14 @@ const fakeHasher: PasswordHasher = {
 };
 
 function setup() {
-  const users = new InMemoryUsers();
+  const order: string[] = [];
+  const transaction = new FakeApplicationTransaction(order);
+  const outbox = { publishMany: vi.fn(async () => []) };
+  const eventBus = { publishMany: vi.fn(async () => []) };
+  const users = new InMemoryUsers(new DomainEventTracker(transaction, outbox, eventBus, new Set()));
   const sessionRows = new InMemorySessions();
   const sessions = new SessionService(sessionRows, users);
   const limiter = { consume: vi.fn<RateLimiter["consume"]>(async () => true) };
-  const order: string[] = [];
-  const transaction: ApplicationTransactionPort = {
-    run: async (work) => {
-      try {
-        const result = await work();
-        order.push("commit");
-        return result;
-      } catch (error) {
-        order.push("rollback");
-        throw error;
-      }
-    },
-  };
-  const outbox = { publishMany: vi.fn(async () => []) };
-  const eventBus = { publishMany: vi.fn(async () => []) };
-  const scope = new DomainEventScope(transaction, outbox, eventBus, new Set());
   return {
     users,
     order,
@@ -102,11 +93,11 @@ function setup() {
     sessionRows,
     sessions,
     limiter,
-    signUp: new SignUpCommandHandler(users, fakeHasher, limiter, sessions, scope),
+    signUp: new SignUpCommandHandler(users, fakeHasher, limiter, sessions, transaction),
     signIn: new SignInCommandHandler(users, fakeHasher, limiter, sessions),
     signOut: new SignOutCommandHandler(sessions),
     signOutAll: new SignOutAllCommandHandler(sessions),
-    assignRole: new AssignRoleCommandHandler(users, scope),
+    assignRole: new AssignRoleCommandHandler(users, transaction),
     me: new GetCurrentUserQueryHandler(users),
   };
 }

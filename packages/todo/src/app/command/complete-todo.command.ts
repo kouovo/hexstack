@@ -1,4 +1,4 @@
-import { type DomainEventScope, injectDomainEventScope } from "@app/common/cqrs";
+import { type ApplicationTransactionPort, injectApplicationTransaction } from "@app/common/cqrs";
 import { defineCommand, type IRequestHandler, type RequestPayload } from "@app/common/cqrs";
 import { singleton } from "@app/common/di";
 import { z } from "@app/common/zod";
@@ -23,12 +23,12 @@ export type CompleteTodoCommand = RequestPayload<typeof CompleteTodoCommand>;
 export class CompleteTodoCommandHandler implements IRequestHandler<typeof CompleteTodoCommand> {
   constructor(
     @injectTodoRepo() private readonly todoRepo: ITodoRepository,
-    @injectDomainEventScope() private readonly events: DomainEventScope,
+    @injectApplicationTransaction() private readonly transaction: ApplicationTransactionPort,
   ) {}
 
   async execute(command: CompleteTodoCommand): Promise<ITodoDTO> {
     const id = TodoId.create(command.todoId); // already validated by the command schema
-    const changed = await this.events.run(async (track) => {
+    const changed = await this.transaction.run(async () => {
       const todo = await this.todoRepo.findOne(new TodoIdSpecification(id));
       if (!todo) throw new TodoNotFoundError({ todoId: id.value });
 
@@ -40,7 +40,6 @@ export class CompleteTodoCommandHandler implements IRequestHandler<typeof Comple
       if (!(await this.todoRepo.updateIfStatus(todo, expectedStatus))) {
         throw new TodoModifiedConcurrentlyError({ todoId: id.value, expectedStatus });
       }
-      track(todo);
       return todo;
     });
     return toTodoDTO(changed);

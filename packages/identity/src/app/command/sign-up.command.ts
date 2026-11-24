@@ -1,4 +1,4 @@
-import { type DomainEventScope, injectDomainEventScope } from "@app/common/cqrs";
+import { type ApplicationTransactionPort, injectApplicationTransaction } from "@app/common/cqrs";
 import { defineCommand, type IRequestHandler, type RequestPayload } from "@app/common/cqrs";
 import { singleton } from "@app/common/di";
 import { z } from "@app/common/zod";
@@ -40,7 +40,7 @@ export class SignUpCommandHandler implements IRequestHandler<typeof SignUpComman
     @injectPasswordHasher() private readonly hasher: PasswordHasher,
     @injectRateLimiter() private readonly rateLimiter: RateLimiter,
     @injectSessionService() private readonly sessions: SessionService,
-    @injectDomainEventScope() private readonly events: DomainEventScope,
+    @injectApplicationTransaction() private readonly transaction: ApplicationTransactionPort,
   ) {}
 
   async execute(command: SignUpCommand): Promise<AuthResult> {
@@ -60,9 +60,8 @@ export class SignUpCommandHandler implements IRequestHandler<typeof SignUpComman
     const user = UserEntity.signUp(emailSpec.and(new UserPasswordHashSpecification(passwordHash)));
 
     // Account + first session commit together; a thrown duplicate rolls both back.
-    const { session, token } = await this.events.run(async (track) => {
+    const { session, token } = await this.transaction.run(async () => {
       await this.users.insert(user);
-      track(user);
       return this.sessions.start(user.id);
     });
     return { user: toUserDTO(user), token, expiresAt: session.expiresAt };

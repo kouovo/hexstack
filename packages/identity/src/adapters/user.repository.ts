@@ -1,3 +1,4 @@
+import { type DomainEventTracker, injectDomainEventTracker } from "@app/common/cqrs";
 import { type ITransactionManager, injectTransactionManager } from "@app/common/db";
 import { inject, singleton } from "@app/common/di";
 
@@ -33,7 +34,10 @@ const UNIQUE_VIOLATION = "23505";
 
 @singleton()
 export class UserRepository implements IUserRepository {
-  constructor(@injectTransactionManager() private readonly transactions: ITransactionManager) {}
+  constructor(
+    @injectTransactionManager() private readonly transactions: ITransactionManager,
+    @injectDomainEventTracker() private readonly events: DomainEventTracker,
+  ) {}
 
   async findOne(spec: UserSpecification): Promise<UserEntity | undefined> {
     const row = await this.transactions
@@ -59,6 +63,7 @@ export class UserRepository implements IUserRepository {
   }
 
   async insert(user: UserEntity): Promise<void> {
+    this.events.track(user); // first: outside a transaction it throws before writing
     try {
       await this.transactions.getExecutor<IdentityDatabase>().insertInto(USER_TABLE).values(toUserRecord(user)).execute();
     } catch (cause) {
@@ -71,6 +76,7 @@ export class UserRepository implements IUserRepository {
   }
 
   async update(user: UserEntity): Promise<void> {
+    this.events.track(user);
     const values = toUserRecord(user);
     await this.transactions
       .getExecutor<IdentityDatabase>()

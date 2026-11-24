@@ -1,4 +1,4 @@
-import { DomainEventScope } from "@app/common/cqrs";
+import { DomainEventTracker } from "@app/common/cqrs";
 import { OUTBOX_TOPIC } from "@app/common/db";
 import { createOutboxEventBus } from "@app/common/db";
 import { ApplicationTransactionAdapter } from "@app/common/db";
@@ -30,11 +30,19 @@ import { TodoRepository } from "./todo.repository";
 let db: TestDatabase;
 let repo: TodoRepository;
 let outbox: DomainEventPublisher;
+let transaction: ApplicationTransactionAdapter;
+
+const noEventBus = { publishMany: async () => [] };
+const repository = (target: DomainEventPublisher = outbox) =>
+  new TodoRepository(db.transactions, new DomainEventTracker(transaction, target, noEventBus, outboxEventNames(TODO_SUBSCRIPTIONS)));
+/** Fixture writes: an aggregate with events can only be persisted in a transaction. */
+const write = <T>(work: () => Promise<T>) => transaction.run(work);
 
 beforeAll(async () => {
   db = await createTestDatabase();
-  repo = new TodoRepository(db.transactions);
+  transaction = new ApplicationTransactionAdapter(db.transactions);
   outbox = createOutboxEventBus(db.transactions);
+  repo = repository();
 }, 30_000);
 beforeEach(async () => {
   await db.pglite.exec(`DELETE FROM ${TODO_TABLE}; DELETE FROM ${OUTBOX_QUEUE_TABLE};`);
@@ -62,22 +70,17 @@ async function pending(): Promise<PendingEntry[]> {
   });
 }
 
-const noEventBus = { publishMany: async () => [] };
-
-const scope = (target: DomainEventPublisher = outbox) =>
-  new DomainEventScope(new ApplicationTransactionAdapter(db.transactions), target, noEventBus, outboxEventNames(TODO_SUBSCRIPTIONS));
-
 function handlers() {
   return {
-    create: new CreateTodoCommandHandler(repo, scope()),
-    complete: new CompleteTodoCommandHandler(repo, scope()),
-    archive: new ArchiveTodoCommandHandler(repo, scope()),
+    create: new CreateTodoCommandHandler(repo, transaction),
+    complete: new CompleteTodoCommandHandler(repo, transaction),
+    archive: new ArchiveTodoCommandHandler(repo, transaction),
   };
 }
 
 test("round-trips an entity through the table", async () => {
   const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create("persist me")));
-  await repo.insert(todo);
+  await write(() => repo.insert(todo));
   const loaded = await repo.findOne(new TodoIdSpecification(todo.id));
   expect(loaded?.title.value).toBe("persist me");
   expect(loaded?.status.value).toBe("open");
@@ -88,19 +91,20 @@ test("toTodoRecord -> SQL -> toTodoEntity round-trips every column", async () =>
   const at = new Date("2024-01-01T00:00:00.000Z");
   const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create("columns")), at);
   todo.complete(at);
-  await repo.insert(todo);
+  await write(() => repo.insert(todo));
   const loaded = await repo.findOne(new TodoIdSpecification(todo.id));
   expect(toTodoRecord(loaded!)).toEqual(toTodoRecord(todo));
 });
 
+const ids = async (spec: Parameters<TodoRepository["find"]>[0]) =>
+  (await repo.find(spec, { limit: 10 })).map((todo) => todo.title.value).toSorted();
+
 test("specifications are translated to SQL, including and / or / not", async () => {
   const [a, b, c] = ["a", "b", "c"].map((title) => TodoEntity.create(new TodoTitleSpecification(TodoTitle.create(title))));
-  for (const todo of [a!, b!, c!]) await repo.insert(todo);
+  for (const todo of [a!, b!, c!]) await write(() => repo.insert(todo));
   b!.complete();
-  await repo.updateIfStatus(b!, "open");
+  await write(() => repo.updateIfStatus(b!, "open"));
 
-  const ids = async (spec: Parameters<TodoRepository["find"]>[0]) =>
-    (await repo.find(spec, { limit: 10 })).map((todo) => todo.title.value).toSorted();
   const isOpen = new TodoStatusSpecification(TodoStatus.open());
   const isA = new TodoIdSpecification(a!.id);
 
@@ -115,20 +119,26 @@ test("specifications are translated to SQL, including and / or / not", async () 
 
 test("updateIfStatus only wins against the expected stored status", async () => {
   const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create("race")));
-  await repo.insert(todo);
+  await write(() => repo.insert(todo));
   todo.complete();
-  expect(await repo.updateIfStatus(todo, "open")).toBe(true);
+  expect(await write(() => repo.updateIfStatus(todo, "open"))).toBe(true);
   // A stale writer that also loaded the row while it was open now loses.
-  expect(await repo.updateIfStatus(todo, "open")).toBe(false);
+  expect(await write(() => repo.updateIfStatus(todo, "open"))).toBe(false);
   expect((await repo.findOne(new TodoIdSpecification(todo.id)))?.status.value).toBe("completed");
+});
+
+test("persisting an aggregate with events outside a transaction throws before writing", async () => {
+  const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create("no transaction")));
+  await expect(repo.insert(todo)).rejects.toThrow(/outside a transaction/);
+  expect(await repo.findOne(new TodoIdSpecification(todo.id))).toBeUndefined();
 });
 
 test("markCompletionNotified succeeds once, and only for completed todos", async () => {
   const todo = TodoEntity.create(new TodoTitleSpecification(TodoTitle.create("notify")));
-  await repo.insert(todo);
+  await write(() => repo.insert(todo));
   expect(await repo.markCompletionNotified(todo.id, new Date())).toBe(false);
   todo.complete();
-  await repo.updateIfStatus(todo, "open");
+  await write(() => repo.updateIfStatus(todo, "open"));
   expect(await repo.markCompletionNotified(todo.id, new Date())).toBe(true);
   expect(await repo.markCompletionNotified(todo.id, new Date())).toBe(false);
 });
@@ -160,7 +170,7 @@ test("a failing outbox insert rolls back the status change", async () => {
     },
   };
   const created = await handlers().create.execute({ title: "atomic" });
-  const complete = new CompleteTodoCommandHandler(repo, scope(brokenOutbox));
+  const complete = new CompleteTodoCommandHandler(repository(brokenOutbox), transaction);
 
   await expect(complete.execute({ todoId: created.id })).rejects.toThrow("outbox down");
   expect((await repo.findOne(new TodoIdSpecification(TodoId.create(created.id))))?.status.value).toBe("open");
@@ -200,9 +210,8 @@ test("a thrown domain error after a write rolls the real transaction back: no to
 
   const failure = new ExpectedFailure("rule broken after the write");
   await expect(
-    scope().run(async (track) => {
+    transaction.run(async () => {
       await repo.insert(todo);
-      track(todo);
       throw failure;
     }),
   ).rejects.toBe(failure);

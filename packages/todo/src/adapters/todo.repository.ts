@@ -1,3 +1,4 @@
+import { type DomainEventTracker, injectDomainEventTracker } from "@app/common/cqrs";
 import { toPersistenceDate, type ITransactionManager, injectTransactionManager } from "@app/common/db";
 import { inject, singleton } from "@app/common/di";
 
@@ -40,7 +41,10 @@ export const injectTodoRepo = () => inject(TODO_REPO);
 
 @singleton()
 export class TodoRepository implements ITodoRepository {
-  constructor(@injectTransactionManager() private readonly transactions: ITransactionManager) {}
+  constructor(
+    @injectTransactionManager() private readonly transactions: ITransactionManager,
+    @injectDomainEventTracker() private readonly events: DomainEventTracker,
+  ) {}
 
   async findOne(spec: TodoSpecification): Promise<TodoEntity | undefined> {
     const row = await this.transactions
@@ -66,6 +70,7 @@ export class TodoRepository implements ITodoRepository {
   }
 
   async insert(todo: TodoEntity): Promise<void> {
+    this.events.track(todo); // first: outside a transaction it throws before writing
     await this.transactions.getExecutor<TodoDatabase>().insertInto(TODO_TABLE).values(toTodoRecord(todo)).execute();
   }
 
@@ -83,7 +88,9 @@ export class TodoRepository implements ITodoRepository {
       .where("id", "=", todo.id.value)
       .where("status", "=", expected)
       .executeTakeFirst();
-    return result.numUpdatedRows > 0n;
+    if (result.numUpdatedRows === 0n) return false;
+    this.events.track(todo); // only a write that happened publishes its events
+    return true;
   }
 
   async markCompletionNotified(id: TodoId, at: Date): Promise<boolean> {

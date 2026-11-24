@@ -1,6 +1,6 @@
 import { uncached } from "@app/common/cache/testing";
-import { DomainEventScope } from "@app/common/cqrs";
-import type { ApplicationTransactionPort } from "@app/common/cqrs";
+import { DomainEventTracker } from "@app/common/cqrs";
+import { FakeApplicationTransaction } from "@app/common/cqrs/testing";
 import { outboxEventNames } from "@app/common/events";
 import { describe, expect, test, vi } from "vitest";
 
@@ -18,11 +18,15 @@ import { CreateTodoCommandHandler } from "./command/create-todo.command";
 import { NotifyTodoCompletedEventHandler } from "./event/notify-todo-completed-event.handler";
 import { ListTodosQueryHandler } from "./query/list-todos.query";
 
-/** Same conditional-update contract as the SQL adapter; `status`/`notified` model the stored columns. */
+/** Same conditional-update and tracking contract as the SQL adapter; `status`/`notified` model the stored columns. */
 class InMemoryTodoRepository implements ITodoRepository {
   readonly rows = new Map<string, { status: TodoStatusValue; notified: boolean; todo: TodoEntity }>();
 
+  /** Without a tracker (fixtures), events are not published. */
+  constructor(private readonly events?: DomainEventTracker) {}
+
   async insert(todo: TodoEntity) {
+    this.events?.track(todo);
     this.rows.set(todo.id.value, { status: todo.status.value, notified: false, todo });
   }
   async findOne(spec: TodoSpecification) {
@@ -36,6 +40,7 @@ class InMemoryTodoRepository implements ITodoRepository {
     const row = this.rows.get(todo.id.value);
     if (!row || row.status !== expected) return false;
     this.rows.set(todo.id.value, { ...row, status: todo.status.value, todo });
+    this.events?.track(todo);
     return true;
   }
   async markCompletionNotified(id: TodoId) {
@@ -47,30 +52,18 @@ class InMemoryTodoRepository implements ITodoRepository {
 }
 
 function setup() {
-  const repo = new InMemoryTodoRepository();
   const order: string[] = [];
-  const transaction: ApplicationTransactionPort = {
-    run: async (work) => {
-      try {
-        const result = await work();
-        order.push("commit");
-        return result;
-      } catch (error) {
-        order.push("rollback");
-        throw error;
-      }
-    },
-  };
+  const transaction = new FakeApplicationTransaction(order);
   const outbox = { publishMany: vi.fn(async () => []) };
   const eventBus = { publishMany: vi.fn(async () => []) };
-  const scope = new DomainEventScope(transaction, outbox, eventBus, outboxEventNames(TODO_SUBSCRIPTIONS));
+  const repo = new InMemoryTodoRepository(new DomainEventTracker(transaction, outbox, eventBus, outboxEventNames(TODO_SUBSCRIPTIONS)));
   return {
     repo,
     order,
     eventBus,
     outbox,
-    create: new CreateTodoCommandHandler(repo, scope),
-    complete: new CompleteTodoCommandHandler(repo, scope),
+    create: new CreateTodoCommandHandler(repo, transaction),
+    complete: new CompleteTodoCommandHandler(repo, transaction),
     list: new ListTodosQueryHandler(repo, uncached()),
   };
 }

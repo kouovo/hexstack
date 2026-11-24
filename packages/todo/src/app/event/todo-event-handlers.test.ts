@@ -1,5 +1,5 @@
-import { DomainEventScope } from "@app/common/cqrs";
-import type { ApplicationTransactionPort } from "@app/common/cqrs";
+import { DomainEventTracker } from "@app/common/cqrs";
+import { FakeApplicationTransaction } from "@app/common/cqrs/testing";
 import { container } from "@app/common/di";
 import { createInProcessEventBus } from "@app/common/events";
 import { outboxEventNames } from "@app/common/events";
@@ -20,21 +20,8 @@ import { TodoCompletedLogEventHandler } from "./todo-completed-log-event.handler
 import { TodoCreatedLogEventHandler } from "./todo-created-log-event.handler";
 
 function setup() {
-  const todos = new Map<string, TodoEntity>();
-  const repo = {
-    insert: async (todo: TodoEntity) => void todos.set(todo.id.value, todo),
-    findOne: async (spec: TodoSpecification) => [...todos.values()].find((todo) => spec.isSatisfiedBy(todo)),
-    updateIfStatus: async () => true,
-  } as unknown as ITodoRepository;
-
   const order: string[] = [];
-  const transaction: ApplicationTransactionPort = {
-    run: async (work) => {
-      const result = await work();
-      order.push("commit");
-      return result;
-    },
-  };
+  const transaction = new FakeApplicationTransaction(order);
   const outbox = { publishMany: vi.fn(async () => []) };
 
   const created = container.resolve(TodoCreatedLogEventHandler);
@@ -48,15 +35,21 @@ function setup() {
   // The real millstream in-process bus, with the app's logging subscriptions.
   const logging = TODO_SUBSCRIPTIONS.inProcess.filter(({ name }) => name.endsWith(".log"));
   const { bus } = createInProcessEventBus(logging, (handler) => container.resolve(handler));
-  const scope = new DomainEventScope(transaction, outbox, bus, outboxEventNames(TODO_SUBSCRIPTIONS));
+  const events = new DomainEventTracker(transaction, outbox, bus, outboxEventNames(TODO_SUBSCRIPTIONS));
+  const todos = new Map<string, TodoEntity>();
+  const repo = {
+    insert: async (todo: TodoEntity) => (events.track(todo), void todos.set(todo.id.value, todo)),
+    findOne: async (spec: TodoSpecification) => [...todos.values()].find((todo) => spec.isSatisfiedBy(todo)),
+    updateIfStatus: async (todo: TodoEntity) => (events.track(todo), true),
+  } as unknown as ITodoRepository;
 
   return {
     order,
     spies,
     bus,
-    create: new CreateTodoCommandHandler(repo, scope),
-    complete: new CompleteTodoCommandHandler(repo, scope),
-    archive: new ArchiveTodoCommandHandler(repo, scope),
+    create: new CreateTodoCommandHandler(repo, transaction),
+    complete: new CompleteTodoCommandHandler(repo, transaction),
+    archive: new ArchiveTodoCommandHandler(repo, transaction),
   };
 }
 

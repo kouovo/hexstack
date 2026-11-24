@@ -1,6 +1,6 @@
 import { uncached } from "@app/common/cache/testing";
-import { DomainEventScope } from "@app/common/cqrs";
-import type { ApplicationTransactionPort } from "@app/common/cqrs";
+import { DomainEventTracker } from "@app/common/cqrs";
+import { FakeApplicationTransaction } from "@app/common/cqrs/testing";
 import { createInProcessEventBus } from "@app/common/events";
 import { outboxEventNames } from "@app/common/events";
 import { expect, test, vi } from "vitest";
@@ -25,33 +25,28 @@ function setup() {
   const remember = vi.spyOn(cache, "getOrSetVersioned");
   const rows = new Map<string, TodoEntity>();
   let notified = false;
+  const transaction = new FakeApplicationTransaction(order);
+  const outbox = { publishMany: vi.fn(async () => []) };
+  // The real millstream in-process bus with the app's cache-invalidation subscriptions, on this test's cache.
+  const invalidation = new TodoListCacheInvalidationHandler(cache);
+  const subscriptions = TODO_SUBSCRIPTIONS.inProcess.filter(({ handler }) => handler === TodoListCacheInvalidationHandler);
+  const { bus } = createInProcessEventBus(subscriptions, () => invalidation as never);
+  const events = new DomainEventTracker(transaction, outbox, bus, outboxEventNames(TODO_SUBSCRIPTIONS));
+
   const repo: ITodoRepository = {
     insert: async (todo) => {
+      events.track(todo);
       rows.set(todo.id.value, todo);
     },
     findOne: async (spec) => [...rows.values()].find((todo) => spec.isSatisfiedBy(todo)),
     find: async (spec, { limit }) => [...rows.values()].filter((todo) => !spec || spec.isSatisfiedBy(todo)).slice(0, limit),
-    updateIfStatus: async () => true,
+    updateIfStatus: async (todo) => (events.track(todo), true),
     markCompletionNotified: async () => {
       if (notified) return false;
       notified = true;
       return true;
     },
   };
-  const transaction: ApplicationTransactionPort = {
-    run: async (work) => {
-      const result = await work();
-      order.push("commit");
-      return result;
-    },
-  };
-  const outbox = { publishMany: vi.fn(async () => []) };
-
-  // The real millstream in-process bus with the app's cache-invalidation subscriptions, on this test's cache.
-  const invalidation = new TodoListCacheInvalidationHandler(cache);
-  const subscriptions = TODO_SUBSCRIPTIONS.inProcess.filter(({ handler }) => handler === TodoListCacheInvalidationHandler);
-  const { bus } = createInProcessEventBus(subscriptions, () => invalidation as never);
-  const scope = new DomainEventScope(transaction, outbox, bus, outboxEventNames(TODO_SUBSCRIPTIONS));
 
   return {
     cache,
@@ -59,9 +54,9 @@ function setup() {
     remember,
     order,
     outbox,
-    create: new CreateTodoCommandHandler(repo, scope),
-    complete: new CompleteTodoCommandHandler(repo, scope),
-    archive: new ArchiveTodoCommandHandler(repo, scope),
+    create: new CreateTodoCommandHandler(repo, transaction),
+    complete: new CompleteTodoCommandHandler(repo, transaction),
+    archive: new ArchiveTodoCommandHandler(repo, transaction),
     list: new ListTodosQueryHandler(repo, cache),
     notify: new NotifyTodoCompletedEventHandler(repo, cache),
   };
